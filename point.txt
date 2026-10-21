@@ -1,0 +1,53 @@
+nuc03@nuc03-NUC12WSKi5:~$ ros2 topic echo /clicked_point 
+header:
+  stamp:
+    sec: 1773906501
+    nanosec: 429005559
+  frame_id: map
+point:
+  x: 5.68649959564209
+  y: -5.698404312133789
+  z: -0.00037384033203125
+---
+header:
+  stamp:
+    sec: 1773906504
+    nanosec: 245220514
+  frame_id: map
+point:
+  x: 4.094366073608398
+  y: -7.475207328796387
+  z: 0.00026702880859375
+---
+header:
+  stamp:
+    sec: 1773906507
+    nanosec: 874651216
+  frame_id: map
+point:
+  x: 4.303055763244629
+  y: -5.0283284187316895
+  z: 0.00272369384765625
+---
+header:
+  stamp:
+    sec: 1773906510
+    nanosec: 723287473
+  frame_id: map
+point:
+  x: 5.676765441894531
+  y: -7.00404167175293
+  z: 0.000255584716796875
+---
+header:
+  stamp:
+    sec: 1773906515
+    nanosec: 868253160
+  frame_id: map
+point:
+  x: 0.3522481918334961
+  y: -3.1917195320129395
+  z: -0.001392364501953125
+---
+
+

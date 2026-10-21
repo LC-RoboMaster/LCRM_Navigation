@@ -1,0 +1,9 @@
+topics:
+  /cmd_vel:
+    type: geometry_msgs/msg/Twist
+    from_domain: 20
+    to_domain: 10
+  /robot/nav_state:
+    type: std_msgs/msg/Int32
+    from_domain: 20
+    to_domain: 10

@@ -1,0 +1,44 @@
+<robot name="test_bot">
+  <!-- 世界坐标系 -->
+  <link name="odom"/>
+
+  <!-- 主体 -->
+  <joint name="odom_to_base" type="fixed">
+    <parent link="odom"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="base_link"/>
+
+  <!-- 雷达 -->
+  <joint name="base_to_lidar" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="lidar_link"/>
+
+  <!-- IMU -->
+  <joint name="base_to_imu" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="imu_link"/>
+
+  <!-- 相机 -->
+  <joint name="base_to_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="camera_link"/>
+
+  <!-- 云台 -->
+  <joint name="base_to_gimbal" type="fixed">
+    <parent link="base_link"/>
+    <child link="gimbal_yaw_fake"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="gimbal_yaw_fake"/>
+</robot>

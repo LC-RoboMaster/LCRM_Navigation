@@ -1,0 +1,17 @@
+# Colcon / ROS2 构建产物
+build/
+install/
+log/
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 编译中间产物
+*.o
