@@ -69,7 +69,9 @@ target_link_libraries(passage_export_nav2_map PRIVATE tdt_passage)
 install(TARGETS lc_passage_nav2_plugin
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 install(TARGETS passage_export_nav2_map RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY config docs DESTINATION share/${PROJECT_NAME})
+# Runtime parameters are installed by pb2025_nav_bringup. Git does not retain
+# the unused empty config/ directory, so only install the tracked documentation.
+install(DIRECTORY docs DESTINATION share/${PROJECT_NAME})
 install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)

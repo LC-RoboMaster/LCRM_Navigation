@@ -102,8 +102,8 @@ public:
   }
   bool getTolerances(geometry_msgs::msg::Pose &p,
                      geometry_msgs::msg::Twist &v) override {
-    p = {};
-    v = {};
+    p = geometry_msgs::msg::Pose{};
+    v = geometry_msgs::msg::Twist{};
     p.position.x = p.position.y = xy_;
     p.orientation.z = std::sin(yaw_ / 2);
     p.orientation.w = std::cos(yaw_ / 2);

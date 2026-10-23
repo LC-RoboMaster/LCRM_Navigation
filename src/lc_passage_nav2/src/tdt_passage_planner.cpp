@@ -108,7 +108,7 @@ void TdtPassagePlanner::cleanup() {
   project_ = {};
   node_.reset();
   std::lock_guard<std::mutex> guard(state_mutex_);
-  committed_ = {};
+  committed_ = lc_passage_msgs::msg::PassagePlan{};
   locked_ = false;
 }
 nav_msgs::msg::Path
