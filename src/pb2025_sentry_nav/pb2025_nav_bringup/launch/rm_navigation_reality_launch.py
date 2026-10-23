@@ -180,6 +180,7 @@ def generate_launch_description():
         launch_arguments={
             "namespace": namespace,
             "slam": slam,
+                "passage_file": LaunchConfiguration("passage_file"),
             "map": map_yaml_file,
             "prior_pcd_file": prior_pcd_file,
             "use_sim_time": use_sim_time,
@@ -202,6 +203,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Declare the launch options
+    ld.add_action(DeclareLaunchArgument("passage_file", default_value="auto", description="Absolute channel JSON exported by passage_map_editor"))
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_slam_cmd)
     ld.add_action(declare_world_cmd)
@@ -224,3 +226,4 @@ def generate_launch_description():
     ld.add_action(rviz_cmd)
 
     return ld
+

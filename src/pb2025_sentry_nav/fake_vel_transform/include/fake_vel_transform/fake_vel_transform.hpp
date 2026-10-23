@@ -16,6 +16,9 @@
 #define FAKE_VEL_TRANSFORM__FAKE_VEL_TRANSFORM_HPP_
 
 #include <memory>
+#include <atomic>
+#include <chrono>
+#include "lc_passage_msgs/msg/passage_state.hpp"
 #include <mutex>
 #include <string>
 
@@ -71,13 +74,17 @@ private:
   std::string input_cmd_vel_topic_;
   std::string output_cmd_vel_topic_;
   float spin_speed_;
+  std::atomic<bool> passage_locked_{false}, passage_stop_{false};
+  std::chrono::steady_clock::time_point passage_received_{};
+  rclcpp::Subscription<lc_passage_msgs::msg::PassageState>::SharedPtr passage_sub_;
 
   std::mutex cmd_vel_mutex_;
   geometry_msgs::msg::Twist::SharedPtr latest_cmd_vel_;
-  double current_robot_base_angle_;
+  double current_robot_base_angle_ = 0.;
   rclcpp::Time last_controller_activate_time_;
 };
 
 }  // namespace fake_vel_transform
 
 #endif  // FAKE_VEL_TRANSFORM__FAKE_VEL_TRANSFORM_HPP_
+

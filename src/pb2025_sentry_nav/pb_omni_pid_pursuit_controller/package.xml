@@ -9,6 +9,8 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>lc_passage_nav2</depend>
+  <depend>lc_passage_msgs</depend>
   <depend>nav2_common</depend>
   <depend>nav2_core</depend>
   <depend>nav2_util</depend>
@@ -32,3 +34,4 @@
   </export>
 
 </package>
+

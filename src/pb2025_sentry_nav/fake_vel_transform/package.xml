@@ -13,6 +13,7 @@
 
   <!-- depend: build, export, and execution dependency -->
   <depend>rclcpp</depend>
+  <depend>lc_passage_msgs</depend>
   <depend>rclcpp_components</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
@@ -30,3 +31,4 @@
     <build_type>ament_cmake</build_type>
   </export>
 </package>
+

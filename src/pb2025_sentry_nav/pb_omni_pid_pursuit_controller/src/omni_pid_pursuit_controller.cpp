@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "pb_omni_pid_pursuit_controller/omni_pid_pursuit_controller.hpp"
+#include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
 
 #include "nav2_core/exceptions.hpp"
 #include "nav2_util/geometry_utils.hpp"
@@ -39,6 +40,11 @@ void OmniPidPursuitController::configure(
   if (!node) {
     throw nav2_core::PlannerException("Unable to lock node!");
   }
+
+  bool enable_passages = false;
+  declare_parameter_if_not_declared(node, name + ".enable_passage_management", rclcpp::ParameterValue(false));
+  node->get_parameter(name + ".enable_passage_management", enable_passages);
+  if (enable_passages) passage_ = std::make_unique<lc_passage_nav2::PassageController>(node, name);
 
   costmap_ros_ = costmap_ros;
   costmap_ = costmap_ros_->getCostmap();
@@ -182,6 +188,8 @@ void OmniPidPursuitController::cleanup()
     "Cleaning up controller: %s of type"
     " pb_omni_pid_pursuit_controller::OmniPidPursuitController",
     plugin_name_.c_str());
+  if (passage_) passage_->suspend();
+  passage_.reset();
   local_path_pub_.reset();
   carrot_pub_.reset();
   curvature_points_pub_.reset();
@@ -210,6 +218,7 @@ void OmniPidPursuitController::deactivate()
     "Deactivating controller: %s of type "
     "regulated_pure_pursuit_controller::OmniPidPursuitController",
     plugin_name_.c_str());
+  if (passage_) passage_->suspend();
   local_path_pub_->on_deactivate();
   carrot_pub_->on_deactivate();
   curvature_points_pub_->on_deactivate();
@@ -225,6 +234,20 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   nav2_costmap_2d::Costmap2D * costmap = costmap_ros_->getCostmap();
   std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(*(costmap->getMutex()));
 
+  lc_passage_nav2::ExecutionOutput passage_state;
+  if (passage_) {
+    geometry_msgs::msg::PoseStamped map_pose;
+    if (!transformPose(passage_->frame(), pose, map_pose)) {
+      passage_->suspend();
+      geometry_msgs::msg::TwistStamped stopped; stopped.header = pose.header; return stopped;
+    }
+    passage_state = passage_->step({map_pose.pose.position.x, map_pose.pose.position.y},
+      std::hypot(velocity.linear.x, velocity.linear.y), velocity.angular.z);
+    if (passage_state.stop) {
+      geometry_msgs::msg::TwistStamped stopped; stopped.header = pose.header; return stopped;
+    }
+  }
+
   // Transform path to robot base frame
   auto transformed_plan = transformGlobalPlan(pose);
 
@@ -232,13 +255,23 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   double lookahead_dist = getLookAheadDistance(velocity);
 
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
+  if (passage_ && passage_state.phase != "NORMAL") {
+    // 通道和释放段使用原始路径的短前视点；不让普通长前视切过入口折角。
+    auto target = passage_->target(passage_state.locked ? 0.12 : lookahead_dist);
+    geometry_msgs::msg::PoseStamped fixed; fixed.header.frame_id = passage_->frame();
+    fixed.header.stamp = pose.header.stamp; fixed.pose.position.x = target.x;
+    fixed.pose.position.y = target.y; fixed.pose.orientation.w = 1.;
+    if (!transformPose(costmap_ros_->getBaseFrameID(), fixed, carrot_pose)) {
+      passage_->suspend(); geometry_msgs::msg::TwistStamped stopped; stopped.header = pose.header; return stopped;
+    }
+  }
   carrot_pub_->publish(createCarrotMsg(carrot_pose));
 
   double lin_dist = hypot(carrot_pose.pose.position.x, carrot_pose.pose.position.y);
   double theta_dist = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
   double angle_to_goal = tf2::getYaw(carrot_pose.pose.orientation);
 
-  if (use_rotate_to_heading_) {
+  if (use_rotate_to_heading_ && !passage_state.locked) {
     angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     if (fabs(angle_to_goal) > use_rotate_to_heading_treshold_) {
       lin_dist = 0;
@@ -252,15 +285,21 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
 
   applyApproachVelocityScaling(transformed_plan, lin_vel);
 
+  // 外部限速、通道限速同时生效，不得在曲率/临近目标缩放后重新放大。
+  const double limit = std::min(external_speed_limit_, passage_state.speed_limit);
+  lin_vel = std::clamp(lin_vel, -limit, limit);
+  if (passage_state.locked) angular_vel = 0.;
+
   // Transform local frame to global frame to use in collision checking
   nav_msgs::msg::Path costmap_frame_local_plan;
 
-  int sample_points = 10;
-  int plan_size = transformed_plan.poses.size();
-  for (int i = 0; i < sample_points; ++i) {
-    int index = std::min((i * plan_size) / sample_points, plan_size - 1);
+  // 检查稠密路径的全部采样点，避免固定十点采样漏过新出现的薄障碍。
+  for (const auto & sample : transformed_plan.poses) {
     geometry_msgs::msg::PoseStamped map_pose;
-    transformPose(costmap_ros_->getGlobalFrameID(), transformed_plan.poses[index], map_pose);
+    if (!transformPose(costmap_ros_->getGlobalFrameID(), sample, map_pose)) {
+      if (passage_) passage_->suspend();
+      geometry_msgs::msg::TwistStamped stopped; stopped.header = pose.header; return stopped;
+    }
     costmap_frame_local_plan.poses.push_back(map_pose);
   }
 
@@ -271,18 +310,32 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
     cmd_vel.twist.linear.y = lin_vel * sin(theta_dist);
     cmd_vel.twist.angular.z = angular_vel;
   } else {
+    if (passage_ && passage_state.locked) {
+      // 洞中遇障碍时保持变形并停车，不触发会倒退/旋转的恢复动作。
+      passage_->hold(); return cmd_vel;
+    }
     throw nav2_core::PlannerException("Collision detected in the trajectory. Stopping the robot!");
   }
 
   return cmd_vel;
 }
 
-void OmniPidPursuitController::setPlan(const nav_msgs::msg::Path & path) { global_plan_ = path; }
+void OmniPidPursuitController::setPlan(const nav_msgs::msg::Path & path)
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  // global_plan_ 会被 transformGlobalPlan 裁剪。锁定时保留它，避免重发整条路径后回头找起点。
+  if (passage_ && passage_->locked()) return;
+  if (passage_) passage_->setPlan(path);
+  global_plan_ = path;
+}
 
 void OmniPidPursuitController::setSpeedLimit(
-  const double & /*speed_limit*/, const bool & /*percentage*/)
+  const double & speed_limit, const bool & percentage)
 {
-  RCLCPP_WARN(logger_, "Speed limit is not implemented in this controller.");
+  std::lock_guard<std::mutex> guard(mutex_);
+  if (speed_limit == nav2_costmap_2d::NO_SPEED_LIMIT) external_speed_limit_ = std::numeric_limits<double>::infinity();
+  else if (std::isfinite(speed_limit) && speed_limit >= 0.)
+    external_speed_limit_ = percentage ? v_linear_max_ * std::clamp(speed_limit / 100., 0., 1.) : speed_limit;
 }
 
 nav_msgs::msg::Path OmniPidPursuitController::transformGlobalPlan(
@@ -455,7 +508,14 @@ bool OmniPidPursuitController::isCollisionDetected(const nav_msgs::msg::Path & p
     const auto & pose = pose_stamped.pose;
     unsigned int mx, my;
     if (costmap->worldToMap(pose.position.x, pose.position.y, mx, my)) {
-      if (costmap->getCost(mx, my) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+      unsigned char blocked = nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+      if (passage_) {
+        geometry_msgs::msg::PoseStamped map_pose;
+        if (transformPose(passage_->frame(), pose_stamped, map_pose) &&
+            passage_->insideSpecial({map_pose.pose.position.x, map_pose.pose.position.y}))
+          blocked = nav2_costmap_2d::LETHAL_OBSTACLE;
+      }
+      if (costmap->getCost(mx, my) >= blocked) {
         return true;
       }
     } else {
@@ -763,3 +823,4 @@ rcl_interfaces::msg::SetParametersResult OmniPidPursuitController::dynamicParame
 #include "pluginlib/class_list_macros.hpp"
 PLUGINLIB_EXPORT_CLASS(
   pb_omni_pid_pursuit_controller::OmniPidPursuitController, nav2_core::Controller)
+

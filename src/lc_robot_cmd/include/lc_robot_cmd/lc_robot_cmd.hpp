@@ -2,6 +2,7 @@
 #define LC_ROBOT_CMD_HPP_
 
 #include <memory>
+#include "lc_passage_msgs/msg/passage_state.hpp"
 #include <string>
 #include <vector>
 
@@ -23,6 +24,8 @@ public:
   explicit LcRobotCmdNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
 private:
+  bool passage_locked_ = false;
+  rclcpp::Subscription<lc_passage_msgs::msg::PassageState>::SharedPtr passage_sub_;
   /* ========== FSM ========== */
     enum class RobotState
     {

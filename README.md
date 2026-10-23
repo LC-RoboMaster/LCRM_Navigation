@@ -2,6 +2,14 @@
 
 湖北工业大学（HBUT）力创战队 RoboMaster 2027 赛季哨兵/步兵导航工作空间，基于 **ROS2 Humble + Nav2** 导航框架。
 
+## 通道导航
+
+已集成 TDT 全局规划插件、PID 控制器内的变形状态管理和独立 C++/Qt 通道编辑器。支持无通道配置的在线建图导航，也支持保存地图后编辑旋转矩形通道，再加载地图与通道文件按中线通行。实时低矮障碍继续参与避障。
+
+- [导航使用、运行参数及验证](src/lc_passage_nav2/README.md)
+- [Qt 地图编辑器](tools/passage_map_editor/README.md)
+- [底盘变形命令与反馈接口](src/lc_passage_nav2/docs/INTERFACES.md)
+
 ## 环境要求
 
 - Ubuntu 22.04
@@ -29,7 +37,7 @@ source install/setup.bash
 | `save_map.sh` | 保存当前地图为 `scans.pgm` / `scans.yaml` |
 | `cp_map_data.sh` | 将地图/点云数据拷贝到 `pb2025_nav_bringup` 对应目录并重新构建 |
 
-> 注：脚本内的绝对路径基于原车端目录 `/home/nuc03/...`，移植到新环境时请按需调整。
+> 导航和地图保存脚本按当前仓库定位工作空间，并转发命令行参数；其余决策、数据拷贝脚本仍保留原车端路径，移植时需调整。
 
 ## 子项目说明
 
@@ -60,3 +68,4 @@ source install/setup.bash
 - [pb2025_robot_description](https://github.com/SMBU-PolarBear-Robotics-Team/pb2025_robot_description)（深圳北理莫斯科大学北极熊战队）
 - [sdformat_tools](https://github.com/gezp/sdformat_tools)（gezp）
 - [NAV2](https://github.com/ros-navigation/navigation2)
+

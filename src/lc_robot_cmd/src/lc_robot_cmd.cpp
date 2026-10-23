@@ -88,6 +88,10 @@ LcRobotCmdNode::LcRobotCmdNode(const rclcpp::NodeOptions & options)
     nav_status_ = NavState::IDLE;
     hp_ = 100;
 
+    passage_sub_ = create_subscription<lc_passage_msgs::msg::PassageState>("passage/state",
+      rclcpp::QoS(1).reliable().transient_local(), [this](lc_passage_msgs::msg::PassageState::ConstSharedPtr s) {
+        passage_locked_ = s->locked;
+      });
     RCLCPP_INFO(get_logger(), "LcRobotCmdNode node started.");
 }
 
@@ -149,6 +153,8 @@ void LcRobotCmdNode::stateUpdate()
 
 void LcRobotCmdNode::switchState(RobotState new_state)
 {
+    // 正常任务切换延迟到出口释放后；急停仍可直接取消 action 并停车。
+    if (passage_locked_ && new_state != RobotState::IDLE) return;
     if (new_state == current_state_ && 
         (nav_status_ == NavState::ACTIVE || nav_status_ == NavState::SENDING)) {
         return;

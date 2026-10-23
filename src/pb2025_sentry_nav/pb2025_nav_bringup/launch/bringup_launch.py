@@ -21,6 +21,8 @@ from launch.actions import (
     GroupAction,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
+    OpaqueFunction,
+    SetLaunchConfiguration,
 )
 from launch.conditions import (
     IfCondition,
@@ -34,6 +36,19 @@ from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
+def resolve_passage_file(context):
+    """离线地图可自动读取同名通道；建图时默认无通道，不依赖旧地图。"""
+    path = LaunchConfiguration("passage_file").perform(context)
+    if path == "auto":
+        mapping = LaunchConfiguration("slam").perform(context).lower() == "true"
+        map_path = LaunchConfiguration("map").perform(context)
+        sidecar = os.path.splitext(os.path.abspath(map_path))[0] + ".passages.json"
+        path = sidecar if not mapping and os.path.isfile(sidecar) else ""
+    if path and not os.path.isfile(path):
+        raise RuntimeError("Passage file does not exist: " + path)
+    return [SetLaunchConfiguration("passage_file", os.path.abspath(path) if path else "")]
+
+
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory("pb2025_nav_bringup")
@@ -42,6 +57,7 @@ def generate_launch_description():
     # Create the launch configuration variables
     namespace = LaunchConfiguration("namespace")
     slam = LaunchConfiguration("slam")
+    passage_file = LaunchConfiguration("passage_file", default="")
     map_yaml_file = LaunchConfiguration("map")
     prior_pcd_file = LaunchConfiguration("prior_pcd_file")
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -179,6 +195,7 @@ def generate_launch_description():
                     "use_composition": use_composition,
                     "use_respawn": use_respawn,
                     "container_name": "nav2_container",
+                    "passage_file": passage_file,
                 }.items(),
             ),
             IncludeLaunchDescription(
@@ -193,6 +210,7 @@ def generate_launch_description():
                     "use_composition": use_composition,
                     "use_respawn": use_respawn,
                     "container_name": "nav2_container",
+                    "passage_file": passage_file,
                 }.items(),
             ),
         ]
@@ -207,6 +225,7 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
+    ld.add_action(DeclareLaunchArgument("passage_file", default_value="auto", description="Editor channel JSON"))
     ld.add_action(declare_slam_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_prior_pcd_file_cmd)
@@ -218,6 +237,8 @@ def generate_launch_description():
     ld.add_action(declare_log_level_cmd)
 
     # Add the actions to launch all of the navigation nodes
+    ld.add_action(OpaqueFunction(function=resolve_passage_file))
     ld.add_action(bringup_cmd_group)
 
     return ld
+

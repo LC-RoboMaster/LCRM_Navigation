@@ -7,3 +7,11 @@ topics:
     type: std_msgs/msg/Int32
     from_domain: 20
     to_domain: 10
+  /passage/deformation_command:
+    type: lc_passage_msgs/msg/DeformationCommand
+    from_domain: 20
+    to_domain: 10
+  /passage/deformation_feedback:
+    type: lc_passage_msgs/msg/DeformationFeedback
+    from_domain: 10
+    to_domain: 20

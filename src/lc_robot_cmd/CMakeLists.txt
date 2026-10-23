@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(lc_passage_msgs REQUIRED)
 
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -32,7 +33,7 @@ endif()
 
 add_executable(lc_robot_cmd src/lc_robot_cmd.cpp)
 
-ament_target_dependencies(lc_robot_cmd  
+ament_target_dependencies(lc_robot_cmd lc_passage_msgs
   rclcpp
   rclcpp_action
   nav2_msgs
@@ -49,3 +50,4 @@ DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()
+

@@ -16,6 +16,8 @@
 #define PB_OMNI_PID_PURSUIT_CONTROLLER__OMNI_PID_PURSUIT_CONTROLLER_HPP_
 
 #include <memory>
+#include "lc_passage_nav2/passage_controller.hpp"
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -265,7 +267,7 @@ private:
   nav2_costmap_2d::Costmap2D * costmap_;
   rclcpp::Logger logger_{rclcpp::get_logger("OmniPidPursuitController")};
   rclcpp::Clock::SharedPtr clock_;
-  double last_velocity_scaling_factor_;
+  double last_velocity_scaling_factor_ = 1.0;
 
   std::shared_ptr<PID> move_pid_;
   std::shared_ptr<PID> heading_pid_;
@@ -299,6 +301,8 @@ private:
   double max_velocity_scaling_factor_rate_;
   tf2::Duration transform_tolerance_;
 
+  std::unique_ptr<lc_passage_nav2::PassageController> passage_;
+  double external_speed_limit_ = std::numeric_limits<double>::infinity();
   nav_msgs::msg::Path global_plan_;
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr local_path_pub_;
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PointStamped>::SharedPtr carrot_pub_;
@@ -313,3 +317,4 @@ private:
 }  // namespace pb_omni_pid_pursuit_controller
 
 #endif  // PB_OMNI_PID_PURSUIT_CONTROLLER__OMNI_PID_PURSUIT_CONTROLLER_HPP_
+

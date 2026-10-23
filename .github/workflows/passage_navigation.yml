@@ -1,0 +1,44 @@
+name: Passage navigation
+on:
+  push:
+    paths: ['src/lc_passage_*/**', 'tools/passage_map_editor/**', 'src/pb2025_sentry_nav/pb_omni_pid_pursuit_controller/**', 'src/pb2025_sentry_nav/fake_vel_transform/**', 'src/pb2025_sentry_nav/pb2025_nav_bringup/**', '.github/workflows/passage_navigation.yml']
+  pull_request:
+  workflow_dispatch:
+jobs:
+  humble:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3-colcon-common-extensions libopencv-dev libeigen3-dev nlohmann-json3-dev qtbase5-dev libyaml-cpp-dev uuid-dev ros-humble-example-interfaces ros-humble-nav2-controller ros-humble-nav2-planner ros-humble-nav2-behavior-tree ros-humble-ament-cmake-auto ros-humble-ament-cmake-gtest
+      - name: Build planner and messages
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-select lc_passage_msgs lc_passage_nav2 --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      - name: Build existing integration modules
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          colcon build --packages-select pb_omni_pid_pursuit_controller fake_vel_transform lc_robot_cmd --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+      - name: ROS and core tests
+        shell: bash
+        env:
+          ROS_LOCALHOST_ONLY: '1'
+          ROS_DOMAIN_ID: '167'
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          colcon test --packages-select lc_passage_nav2 --event-handlers console_direct+ --return-code-on-test-failure
+          colcon test-result --verbose
+      - name: Independent Qt editor
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cmake -S tools/passage_map_editor -B build-editor -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-editor --parallel 2
+          ctest --test-dir build-editor --output-on-failure

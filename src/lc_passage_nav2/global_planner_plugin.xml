@@ -1,0 +1,9 @@
+<library path="lc_passage_nav2_plugin">
+  <class name="lc_passage_nav2/TdtPassagePlanner"
+         type="lc_passage_nav2::TdtPassagePlanner"
+         base_class_type="nav2_core::GlobalPlanner">
+    <description>TDT ordinary planning with directed immutable passage lines.</description>
+  </class>
+  <class name="lc_passage_nav2/PassageProgressChecker" type="lc_passage_nav2::PassageProgressChecker" base_class_type="nav2_core::ProgressChecker"><description>Bounded deformation waits.</description></class>
+  <class name="lc_passage_nav2/PassageGoalChecker" type="lc_passage_nav2::PassageGoalChecker" base_class_type="nav2_core::GoalChecker"><description>Wait for release and restoration.</description></class>
+</library>

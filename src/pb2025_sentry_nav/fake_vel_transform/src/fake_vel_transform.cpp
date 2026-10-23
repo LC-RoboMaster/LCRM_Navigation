@@ -46,6 +46,16 @@ FakeVelTransform::FakeVelTransform(const rclcpp::NodeOptions & options)
   this->get_parameter("output_cmd_vel_topic", output_cmd_vel_topic_);
   this->get_parameter("init_spin_speed", spin_speed_);
 
+  passage_sub_ = create_subscription<lc_passage_msgs::msg::PassageState>(
+    "passage/state", rclcpp::QoS(1).reliable().transient_local(),
+    [this](lc_passage_msgs::msg::PassageState::ConstSharedPtr s) {
+      std::lock_guard<std::mutex> guard(cmd_vel_mutex_);
+      passage_locked_ = s->locked || s->folded;
+      passage_stop_ = s->stop || s->fault;
+      passage_received_ = std::chrono::steady_clock::now();
+      if (passage_stop_) cmd_vel_chassis_pub_->publish(geometry_msgs::msg::Twist{});
+    });
+
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   cmd_vel_chassis_pub_ =
@@ -134,6 +144,13 @@ void FakeVelTransform::syncCallback(
 
 void FakeVelTransform::publishTransform()
 {
+  {
+    std::lock_guard<std::mutex> guard(cmd_vel_mutex_);
+    // 最终速度门位于平滑器之后：停车时不能被残留平滑速度或陀螺自旋覆盖。
+    if (passage_locked_ && std::chrono::duration<double>(std::chrono::steady_clock::now() - passage_received_).count() > .5)
+      passage_stop_ = true;
+    if (passage_stop_) cmd_vel_chassis_pub_->publish(geometry_msgs::msg::Twist{});
+  }
   geometry_msgs::msg::TransformStamped t;
   t.header.stamp = this->get_clock()->now();
   t.header.frame_id = robot_base_frame_;
@@ -148,7 +165,8 @@ geometry_msgs::msg::Twist FakeVelTransform::transformVelocity(
   const geometry_msgs::msg::Twist::SharedPtr & twist, float yaw_diff)
 {
   geometry_msgs::msg::Twist aft_tf_vel;
-  aft_tf_vel.angular.z = twist->angular.z + spin_speed_;
+  if (passage_stop_) return aft_tf_vel;
+  aft_tf_vel.angular.z = passage_locked_ ? 0. : twist->angular.z + spin_speed_;
   aft_tf_vel.linear.x = twist->linear.x * cos(yaw_diff) + twist->linear.y * sin(yaw_diff);
   aft_tf_vel.linear.y = -twist->linear.x * sin(yaw_diff) + twist->linear.y * cos(yaw_diff);
   return aft_tf_vel;
@@ -158,3 +176,4 @@ geometry_msgs::msg::Twist FakeVelTransform::transformVelocity(
 
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(fake_vel_transform::FakeVelTransform)
+

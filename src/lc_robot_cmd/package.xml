@@ -13,6 +13,7 @@
   <depend>rclcpp_action</depend>
   
   <depend>nav2_msgs</depend>
+  <depend>lc_passage_msgs</depend>
   
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
@@ -28,3 +29,4 @@
     <build_type>ament_cmake</build_type>
   </export>
 </package>
+
