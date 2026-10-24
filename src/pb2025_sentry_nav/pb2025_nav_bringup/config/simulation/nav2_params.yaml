@@ -330,7 +330,7 @@ controller_server:
     FollowPath:
       plugin: "pb_omni_pid_pursuit_controller::OmniPidPursuitController"
       enable_passage_management: true
-      passage_file: ""
+      passage_file: "/home/spaaaaace/Code/HBUT2025_rm_vision/2027_navigation_ws/src/pb2025_sentry_nav/pb2025_nav_bringup/map/simulation/rmuc2025.json"
       passage_action_timeout: 8.0
       passage_stop_tolerance: 0.04
       passage_deceleration: 0.8
@@ -486,7 +486,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "lc_passage_nav2/TdtPassagePlanner"
-      passage_file: ""  # 启动参数统一覆写；空字符串为普通实时地图规划
+      passage_file: "/home/spaaaaace/Code/HBUT2025_rm_vision/2027_navigation_ws/src/pb2025_sentry_nav/pb2025_nav_bringup/map/simulation/rmuc2025.json"  # 启动参数统一覆写；空字符串为普通实时地图规划
       unknown_is_obstacle: true
       safety_margin: 0.02
       obstacle_weight: 2.0
@@ -611,4 +611,4 @@ pb_teleop_twist_joy_node:
 passage_map:
   ros__parameters:
     use_sim_time: false
-    passage_file: ""
+    passage_file: "/home/spaaaaace/Code/HBUT2025_rm_vision/2027_navigation_ws/src/pb2025_sentry_nav/pb2025_nav_bringup/map/simulation/rmuc2025.json"

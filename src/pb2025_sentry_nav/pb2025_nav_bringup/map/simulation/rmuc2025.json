@@ -1,0 +1,178 @@
+{
+    "blockers": [
+    ],
+    "map": {
+        "allow_unknown": false,
+        "frame_id": "map",
+        "free_min": 196,
+        "image": "rmuc2025_map.png",
+        "negate": false,
+        "occupied_max": 65,
+        "origin": [
+            0,
+            0
+        ],
+        "resolution": 0.05,
+        "yaw": 0
+    },
+    "passages": [
+        {
+            "action_cost_seconds": 1,
+            "auto_endpoints": true,
+            "beam_max_height": 2,
+            "beam_min_height": 0.26,
+            "clear_static": true,
+            "direction": "both",
+            "enabled": true,
+            "endpoint_a": [
+                10.61465797284296,
+                5.029438926620374
+            ],
+            "endpoint_b": [
+                12.399644798415025,
+                5.738065929022884
+            ],
+            "fold_hold_seconds": 0.3,
+            "id": "passage_01",
+            "mode": "folded",
+            "prepare_distance": 0.8,
+            "region": {
+                "center": [
+                    11.507151385628992,
+                    5.383752427821629
+                ],
+                "length": 1.6205025894280394,
+                "width": 0.982180616380582,
+                "yaw": 0.37791131903175756
+            },
+            "release_distance": 0.4,
+            "restore_hold_seconds": 0.3,
+            "speed": 0.5
+        },
+        {
+            "action_cost_seconds": 1,
+            "auto_endpoints": true,
+            "beam_max_height": 2,
+            "beam_min_height": 0.26,
+            "clear_static": true,
+            "direction": "both",
+            "enabled": true,
+            "endpoint_a": [
+                16.681910760796633,
+                10.267422698693519
+            ],
+            "endpoint_b": [
+                18.478828593610125,
+                11.110085865947081
+            ],
+            "fold_hold_seconds": 0.3,
+            "id": "passage_02",
+            "mode": "folded",
+            "prepare_distance": 0.8,
+            "region": {
+                "center": [
+                    17.58036967720338,
+                    10.6887542823203
+                ],
+                "length": 1.6846901298008556,
+                "width": 1.0226433984782102,
+                "yaw": 0.4384998567578515
+            },
+            "release_distance": 0.4,
+            "restore_hold_seconds": 0.3,
+            "speed": 0.5
+        },
+        {
+            "action_cost_seconds": 1,
+            "auto_endpoints": true,
+            "beam_max_height": 2,
+            "beam_min_height": 0.26,
+            "clear_static": true,
+            "direction": "both",
+            "enabled": true,
+            "endpoint_a": [
+                12.6319382956842,
+                13.51768593738105
+            ],
+            "endpoint_b": [
+                13.370337306365276,
+                14.071487256470498
+            ],
+            "fold_hold_seconds": 0.3,
+            "id": "passage_03",
+            "mode": "folded",
+            "prepare_distance": 0.10000000000000007,
+            "region": {
+                "center": [
+                    13.001137801024738,
+                    13.794586596925773
+                ],
+                "length": 0.623,
+                "width": 0.616,
+                "yaw": 0.6435028952103092
+            },
+            "release_distance": 0.10000000000000007,
+            "restore_hold_seconds": 0.3,
+            "speed": 0.5
+        },
+        {
+            "action_cost_seconds": 1,
+            "auto_endpoints": true,
+            "beam_max_height": 2,
+            "beam_min_height": 0.26,
+            "clear_static": true,
+            "direction": "both",
+            "enabled": true,
+            "endpoint_a": [
+                15.960128794096134,
+                2.0398963993527524
+            ],
+            "endpoint_b": [
+                16.445871205903863,
+                2.3641036006472476
+            ],
+            "fold_hold_seconds": 0.3,
+            "id": "passage_04",
+            "mode": "folded",
+            "prepare_distance": 0.09999999999999991,
+            "region": {
+                "center": [
+                    16.203,
+                    2.202
+                ],
+                "length": 0.284,
+                "width": 0.542,
+                "yaw": 0.5885424770650078
+            },
+            "release_distance": 0.1,
+            "restore_hold_seconds": 0.3,
+            "speed": 0.5
+        }
+    ],
+    "planner": {
+        "allow_geometric_fallback": true,
+        "corridor_range": 0.5,
+        "cruise_speed": 1,
+        "graph_budget_ms": 15000,
+        "max_acceleration": 11,
+        "max_speed": 11,
+        "obstacle_decay": 0.1,
+        "obstacle_weight": 0.5,
+        "optimization_iterations": 8,
+        "optimize": true,
+        "robot_radius": 0,
+        "safety_margin": 0,
+        "sample_spacing": 0.025
+    },
+    "schema_version": 1,
+    "test": {
+        "goal": [
+            6.279571036537239,
+            7.322627872002117
+        ],
+        "start": [
+            3.71168788042588,
+            3.628770249268786
+        ]
+    }
+}

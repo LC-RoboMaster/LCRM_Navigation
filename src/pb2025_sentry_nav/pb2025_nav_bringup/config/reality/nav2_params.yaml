@@ -497,19 +497,19 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "lc_passage_nav2/TdtPassagePlanner"
-      passage_file: ""  # 启动参数统一覆写；空字符串为普通实时地图规划
-      unknown_is_obstacle: true
-      safety_margin: 0.02
-      obstacle_weight: 2.0
-      obstacle_decay: 0.35
-      source_cost_weight: 0.5
-      optimize: true
-      allow_geometric_fallback: true
-      cruise_speed: 1.0
-      graph_budget_ms: 1000.0
-      search_timeout_ms: 200.0
-      optimization_timeout_ms: 200.0
-      sample_spacing: 0.025
+      passage_file: ""                  # 启动参数统一覆写；空字符串为普通实时地图规划
+      unknown_is_obstacle: true         # 是否将未知区域当作障碍
+      safety_margin: 0.02               # 安全距离，用于膨胀地图
+      obstacle_weight: 2.0              # 障碍距离惩罚权重，越大越趋向于远离障碍
+      obstacle_decay: 0.35              # 距障碍惩罚公式中的距离偏置，单位 m，当前惩罚项为 obstacle_weight / (obstacle_decay + 距障碍距离)，增大会减弱并平缓近障碍惩罚；它不是膨胀半径
+      source_cost_weight: 0.5           # 输入 Nav2 costmap 的软代价权重，越大越倾向避开原 costmap 的高代价区域；0 表示忽略这部分软代价
+      optimize: true                    # 是否对选中的普通路段进行后端优化
+      allow_geometric_fallback: true    # 优化失败或优化结果未被接受时，是否允许退回已验证的几何路径
+      cruise_speed: 1.0                 # 普通路段的估计行驶速度，单位 m/s，用于计算图中路线代价
+      graph_budget_ms: 1000.0           # 构建图中普通连接边时检查的累计规划预算，单位 ms
+      search_timeout_ms: 200.0          # 每次 A* 搜索的时间预算，单位 ms
+      optimization_timeout_ms: 200.0    # 每段普通路径后端优化的时间预算，单位 ms
+      sample_spacing: 0.025             # 最终路径插值的最大间隔，单位 m；0.025 即 2.5 cm
 
 smoother_server:
   ros__parameters:
