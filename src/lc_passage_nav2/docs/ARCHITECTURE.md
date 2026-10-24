@@ -8,11 +8,15 @@
 
 `global costmap -> TdtPassagePlanner -> Path + PassagePlan -> OmniPidPursuitController -> velocity_smoother -> FakeVelTransform -> cmd_vel`
 
-原始三维点云、里程计、SLAM 扫描、原始地图和重定位输入不被通道处理修改。矩形擦除只作用于静态 OccupancyGrid 的已知占据，未知单元保留；实时点云只在已标注矩形且相对地面高度属于门梁区间时过滤。不会在合并后的 costmap 擦除区域，低矮障碍和中线真实障碍仍有效。
+原始三维点云、里程计、SLAM 扫描、原始地图和重定位输入不被通道处理修改。矩形擦除只作用于静态 OccupancyGrid：默认仅清已知占据，显式设置通道 `clear_unknown=true` 时也清除该矩形内的静态未知；区域外未知保留。实时点云只在已标注矩形且相对地面高度属于门梁区间时过滤。不会在合并后的 costmap 擦除区域，低矮障碍和中线真实障碍仍有效。
 
 ## 全局规划
 
 每次规划短时间持有 costmap mutex 复制栅格，随后释放锁再计算。254 表示物理障碍，255 按未知策略处理，253 及以下保留为软代价；普通区由核心按圆形半径和安全边距膨胀一次。SLAM 扩图不要求编辑工程图片与实时栅格同尺寸。
+
+特殊矩形是对机器人中心的路线约束，先对真实占据做半径膨胀，再屏蔽特殊矩形，避免把语义边界当实体墙额外膨胀并封住 A/B。地图处理、独立 CLI、Nav2 插件使用一致的显式静态未知清理规则；插件自身始终关闭清理，防止擦掉 master costmap 中的实时障碍或未知。
+
+`PassageMapNode` 发布可靠且 transient_local 的 `passage/markers`，显示配置几何，并根据 `passage/active_plan` 与 `passage/state` 绘制实际采用路径上的事件和状态。规划器在成功和失败时都发布 `passage/planner_diagnostics` 与 `passage/planner_markers`，保留每个方向的可用性、拒绝位置、是否选中和路线代价。可视化不会反馈修改地图或执行状态。
 
 普通搜索禁止穿越已声明的特殊矩形，通道 A/B 与外部释放点构成有向图边；双向通道自动交换入口与出口。图搜索可选择绕行、多个通道、连续通道；未选中的通道不产生执行事件。选中普通段可由 TDT 后端优化；通道 A 到 B 再到释放点始终保留直线，不经过 Nav2 后置平滑。
 

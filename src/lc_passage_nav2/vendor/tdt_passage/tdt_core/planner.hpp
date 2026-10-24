@@ -638,9 +638,15 @@ namespace tdt_nav
             cfg_.validate();
         }
 
-        void setMap(const GridMap& map)
+        // forbidden is a constraint on the robot centre (e.g. a special-road
+        // rectangle), not physical occupancy. Apply it AFTER robot inflation:
+        // inflating that artificial boundary can otherwise close its own A/B.
+        void setMap(const GridMap& map, const cv::Mat& forbidden = {})
         {
             map.validate();
+            if (!forbidden.empty() &&
+                (forbidden.type() != CV_8UC1 || forbidden.size() != map.free.size()))
+                throw std::invalid_argument("forbidden mask must be CV_8UC1 and match map");
             std::lock_guard<std::mutex> lock(mutex_);
             auto begin = Clock::now();
             GridMap copy = map;
@@ -659,6 +665,8 @@ namespace tdt_nav
             const double threshold = radius > 0 ? radius / copy.info.resolution + 0.7071067811865476 : 0.;
             cv::compare(distance(cv::Rect(border,border,copy.free.cols,copy.free.rows)),
                         threshold, inflated, cv::CMP_GT);
+            if (!forbidden.empty())
+                inflated.setTo(0, forbidden);
             // 距离场还要把地图外部视为障碍，因此加一圈边界；搜索时取出内部区域。
             cv::Mat field_free, padded_soft;
             cv::copyMakeBorder(inflated, field_free, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));

@@ -7,6 +7,8 @@
 #include <rclcpp_lifecycle/lifecycle_publisher.hpp>
 #include <string>
 #include <tdt_passage/semantic_planner.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace lc_passage_nav2
 {
@@ -33,6 +35,8 @@ namespace lc_passage_nav2
         std::shared_ptr<tf2_ros::Buffer> tf_;
         rclcpp_lifecycle::LifecyclePublisher<
             lc_passage_msgs::msg::PassagePlan>::SharedPtr plan_pub_;
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::String>::SharedPtr diagnostics_pub_;
+        rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
         rclcpp::Subscription<lc_passage_msgs::msg::PassageState>::SharedPtr
         state_sub_;
         rclcpp::Subscription<lc_passage_msgs::msg::PassagePlan>::SharedPtr
@@ -42,6 +46,7 @@ namespace lc_passage_nav2
         lc_passage_msgs::msg::PassagePlan committed_;
         PassageFile config_;
         std::string name_, global_frame_, project_file_;
+        std::string last_diagnostic_state_;
         tdt_passage::Project project_;
         bool configured_ = false, active_ = false, unknown_is_obstacle_ = true;
     };

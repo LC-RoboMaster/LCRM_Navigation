@@ -323,6 +323,9 @@ void MainWindow::buildUi() {
   clearStatic_ = new QCheckBox("清除区域内静态投影（横梁）");
   clearStatic_->setChecked(true);
   form->addRow(clearStatic_);
+  clearUnknown_ = new QCheckBox("同时清除区域内静态未知栅格");
+  clearUnknown_->setToolTip("仅用于已确认的门洞投影；不清除 Nav2 合并后的实时障碍。默认保留未知。");
+  form->addRow(clearUnknown_);
   pv->addLayout(form);
   auto apply = new QPushButton("应用属性");
   apply->setObjectName("applyProperties");
@@ -572,6 +575,7 @@ void MainWindow::syncProperties() {
         g["direction"].toString("both")));
     enabled_->setChecked(g["enabled"].toBool(true));
     clearStatic_->setChecked(g["clear_static"].toBool(true));
+    clearUnknown_->setChecked(g["clear_unknown"].toBool(false));
   }
   for (auto i = vals.begin(); i != vals.end(); ++i)
     fields_[i.key()]->setValue(i.value());
@@ -716,6 +720,7 @@ void MainWindow::applyProperties() {
     g["mode"] = mode_->text();
     g["enabled"] = enabled_->isChecked();
     g["clear_static"] = clearStatic_->isChecked();
+    g["clear_unknown"] = clearUnknown_->isChecked();
     for (const auto &key : {"prepare_distance", "release_distance", "speed",
                             "action_cost_seconds", "fold_hold_seconds", "restore_hold_seconds", "beam_min_height", "beam_max_height"})
       g[key] = value(key);

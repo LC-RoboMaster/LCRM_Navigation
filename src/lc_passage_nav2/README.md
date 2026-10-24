@@ -25,6 +25,30 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 
 `passage_file` 在启动时统一传给地图过滤、规划器和 PID 控制器。文件错误会使配置/启动失败，不会静默退回无通道模式。编辑后重新启动导航加载配置；运行期间不热改通道，以免执行中的路径与地图语义不一致。
 
+## 仿真与 RViz 通道检查
+
+`bash rm_navigation_bringup_sim.sh` 使用当前工作空间安装的 `rmuc_2025.yaml`，自动加载同目录的 `rmuc_2025.passages.json`，并开启**仿真专用**的变形完成反馈。可在脚本末尾传入 launch 参数覆写默认值。编辑工程为 `map/simulation/rmuc2025.json`；该工程已按 YAML 的 `origin=[-3.58,-9.44,0]` 转换全部通道、A/B 和测试点，测试机器人半径为 0.2 m、安全边距为 0.02 m。更换地图时请先在 editor 导入实际 YAML；单独打开图片会丢失地图原点。
+
+默认 RViz 新增两个 MarkerArray 显示，话题随机器人 namespace 变化：
+
+- `passage/markers`：旋转矩形、A/B、方向、中线、通道速度和梁高过滤区间。青色表示已启用，灰色表示禁用。控制器采用路径后，额外显示绿色固定线和 PREPARE/FOLD、ENTER、EXIT、RELEASE/RESTORE。准备点取自实际采用路径的弧长，不能简单用入口直线后退代替。
+- `passage/planner_markers`：最近一次规划的方向检查。绿色为选中，黄色为物理检查可用但本次未选中，红色为拒绝；文字给出原因。黄色也可能是普通道路连接不可达，不能仅凭黄色判定“代价较高”。
+
+两个主题可靠且 transient_local，RViz 后打开也能收到最近快照。没有通道文件时配置标记为空，普通在线建图导航保持可用。
+
+```bash
+# 使用当前仿真默认命名空间；查看每个通道方向的可用性和拒绝原因
+ros2 topic echo /red_standard_robot1/passage/planner_diagnostics --field data --once --qos-durability transient_local
+# 查看控制器实际采用的通道，空数组说明该路径没有过特殊路段
+ros2 topic echo /red_standard_robot1/passage/active_plan --field traversals --once --qos-durability transient_local
+```
+
+矩形只是机器人中心的普通路段禁行约束，先膨胀真实障碍，再屏蔽矩形；不会把语义边界额外膨胀到 A/B。中线出现真实占据或未知时仍拒绝，入口与释放点仍须满足普通机器人半径。规划比较完整路线代价，包含普通道路、通道速度和 `action_cost_seconds`，不强制每个目标都使用通道。
+
+对于已确认的洞口，若门梁抗锯齿灰度被 map_server 的 trinary 阈值判成静态未知，可在 editor 勾选“同时清除区域内静态未知栅格”（`clear_unknown=true`）。默认关闭；仿真示例已对标注的四处开启。清理只发生在静态地图矩形内，master costmap 的实时占据和未知仍能否决固定边。机器人高度没有写死为 260 mm，实时梁高范围来自每个通道的配置。
+
+离线启动会检查工程/新导出文件携带的参考原点、分辨率与 yaw 是否匹配地图 YAML，防止把像素原点 `(0,0)` 的标注直接用于另一张世界坐标地图。旧版无参考元数据的语义 JSON 保持兼容；在线 SLAM 不用此检查限制扩图。
+
 `use_composition:=True/False` 两种启动方式均加载地图过滤组件。仿真可以显式增加 `simulate_deformation:=true` 运行变形反馈模拟器；默认关闭，实车必须接真实反馈。
 
 ## 构建与验证

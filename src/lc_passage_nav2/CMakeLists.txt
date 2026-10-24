@@ -15,7 +15,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 set(ros_dependencies
   rclcpp rclcpp_lifecycle nav2_core nav2_costmap_2d nav2_util
-  nav_msgs geometry_msgs std_msgs tf2_ros pluginlib lc_passage_msgs rclcpp_components sensor_msgs tf2 tf2_geometry_msgs behaviortree_cpp_v3)
+  nav_msgs geometry_msgs std_msgs visualization_msgs tf2_ros pluginlib lc_passage_msgs rclcpp_components sensor_msgs tf2 tf2_geometry_msgs behaviortree_cpp_v3)
 foreach(dependency IN LISTS ros_dependencies)
   find_package(${dependency} REQUIRED)
 endforeach()
@@ -58,7 +58,7 @@ install(TARGETS passage_map_component lc_passage_bt_guards LIBRARY DESTINATION l
 ament_export_targets(export_lc_passage_runtime HAS_LIBRARY_TARGET)
 install(DIRECTORY include/ DESTINATION include)
 ament_export_include_directories(include)
-ament_export_dependencies(lc_passage_msgs rclcpp rclcpp_lifecycle nav_msgs nav2_util nlohmann_json)
+ament_export_dependencies(lc_passage_msgs rclcpp rclcpp_lifecycle nav_msgs nav2_util nlohmann_json visualization_msgs std_msgs geometry_msgs)
 
 add_executable(passage_cli vendor/tdt_passage/cpp/passage_cli.cpp)
 target_link_libraries(passage_cli PRIVATE tdt_passage)
@@ -76,6 +76,14 @@ install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION share/${PROJE
 
 if(BUILD_TESTING)
   enable_testing()
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME passage_map_reference COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/map_reference_test.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/../pb2025_sentry_nav/pb2025_nav_bringup/launch/bringup_launch.py)
+  add_executable(passage_simulation_map_test test/simulation_map_test.cpp)
+  target_link_libraries(passage_simulation_map_test PRIVATE tdt_passage)
+  add_test(NAME passage_simulation_map COMMAND passage_simulation_map_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/../pb2025_sentry_nav/pb2025_nav_bringup/map/simulation/rmuc2025.json)
   add_executable(costmap_snapshot_tests test/costmap_snapshot_tests.cpp)
   target_include_directories(costmap_snapshot_tests PRIVATE include)
   target_link_libraries(costmap_snapshot_tests PRIVATE tdt_passage)

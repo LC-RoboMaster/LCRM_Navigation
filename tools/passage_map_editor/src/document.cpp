@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QSaveFile>
+#include <QSet>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -111,6 +112,7 @@ QJsonObject newPassage(const QJsonObject &r, const QJsonObject &p) {
                 {"direction", "both"},
                 {"enabled", true},
                 {"clear_static", true},
+                {"clear_unknown", false},
                 {"prepare_distance", .8},
                 {"release_distance", .4},
                 {"speed", .5},
@@ -272,7 +274,31 @@ void Document::importMap(const QString &path) {
 }
 void Document::exportPassages(const QString &path) const {
   // 运行时不依赖图片。只输出通道，测试障碍、测试起终点和编辑器状态不进入导航。
+  const auto gates = data["passages"].toArray();
+  if (gates.size() > 16) error("导航最多支持 16 个通道");
+  QSet<QString> ids;
+  for (const auto &v : gates) {
+    const auto g = v.toObject(), r = g["region"].toObject();
+    const auto id = g["id"].toString();
+    if (id.isEmpty() || ids.contains(id)) error("通道编号为空或重复：" + id);
+    ids.insert(id);
+    const auto c = point(r["center"]), d = axis(r["yaw"].toDouble());
+    double along[2]; int i = 0;
+    for (const auto &key : {"endpoint_a", "endpoint_b"}) {
+      const auto p = point(g[key]) - c;
+      along[i++] = dot(p, d);
+      if (!std::isfinite(p.x()) || !std::isfinite(p.y()) ||
+          std::abs(dot(p, QPointF(-d.y(), d.x()))) > .001 ||
+          std::abs(dot(p, d)) <= r["length"].toDouble()/2)
+        error(id + "：A/B 必须位于长轴中线上、矩形外侧。请点击“按区域自动对齐 A / B”。");
+    }
+    if (along[0] * along[1] >= 0) error(id + "：A/B 必须分居区域两端");
+  }
+  const auto map = data["map"].toObject();
+  const QJsonObject reference{{"resolution",map["resolution"]},
+                              {"origin",map["origin"]},{"yaw",map["yaw"]}};
   QJsonObject output{{"schema_version", 1}, {"frame_id", data["map"].toObject()["frame_id"]},
+                     {"map_reference", reference},
                      {"passages", data["passages"]}};
   writeObject(path, output);
 }
@@ -281,6 +307,14 @@ void Document::importPassages(const QString &path) {
   if (j["schema_version"].toInt() != 1 || !j["passages"].isArray()) error("通道文件格式错误");
   const auto frame = j["frame_id"].toString(j["map"].toObject()["frame_id"].toString("map"));
   if (frame != data["map"].toObject()["frame_id"].toString("map")) error("通道与地图 frame_id 不一致");
+  const auto reference = j.contains("map_reference") ? j["map_reference"].toObject() : j["map"].toObject();
+  if (!reference.isEmpty()) {
+    const auto m = data["map"].toObject();
+    if (norm(point(reference["origin"])-point(m["origin"])) > 1e-6 ||
+        std::abs(reference["resolution"].toDouble()-m["resolution"].toDouble()) > 1e-6 ||
+        std::abs(std::remainder(reference["yaw"].toDouble()-m["yaw"].toDouble(),2*Pi)) > 1e-6)
+      error("通道参考地图与当前地图的原点、分辨率或角度不同，请先导入对应的地图 YAML。");
+  }
   checkpoint(); data["passages"] = j["passages"]; touch();
 }
 void Document::save(const QString &path) {

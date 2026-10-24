@@ -1,5 +1,6 @@
 #include "lc_passage_nav2/passage_controller.hpp"
 #include "lc_passage_nav2/tdt_passage_planner.hpp"
+#include "lc_passage_nav2/passage_markers.hpp"
 #include <class_loader/class_loader.hpp>
 #include <cstring>
 #include <filesystem>
@@ -36,7 +37,7 @@ protected:
         .string();
   }
   void writeConfig(const std::string &filename, double center = 0,
-                   double width = 1.2) {
+                   double width = 1.2, bool clear_unknown = false) {
     nlohmann::json j = {
         {"schema_version", 1},
         {"frame_id", "map"},
@@ -49,6 +50,7 @@ protected:
                                              {"endpoint_a", {center - 1., 0.}},
                                              {"endpoint_b", {center + 1., 0.}},
                                              {"speed", .3},
+                                             {"clear_unknown", clear_unknown},
                                              {"prepare_distance", .5},
                                              {"release_distance", .4}}})}};
     std::ofstream(filename) << j.dump();
@@ -70,6 +72,10 @@ TEST_F(RosPassageTest, StaticMapAndLiveHeightFilteringAndGrowingMap) {
   executor.add_node(wrapper.get_node_base_interface());
   executor.add_node(io);
   nav_msgs::msg::OccupancyGrid::SharedPtr received;
+  visualization_msgs::msg::MarkerArray::SharedPtr markers;
+  auto marker_sub = io->create_subscription<visualization_msgs::msg::MarkerArray>(
+      "passage/markers", rclcpp::QoS(1).reliable().transient_local(),
+      [&](visualization_msgs::msg::MarkerArray::SharedPtr m) { markers = m; });
   auto sub = io->create_subscription<nav_msgs::msg::OccupancyGrid>(
       "passage_map", rclcpp::QoS(1).reliable().transient_local(),
       [&](nav_msgs::msg::OccupancyGrid::SharedPtr m) { received = m; });
@@ -88,6 +94,12 @@ TEST_F(RosPassageTest, StaticMapAndLiveHeightFilteringAndGrowingMap) {
   map.data[21 * 100 + 40] = -1;
   map.data[60 * 100 + 90] = 100;
   pump();
+  ASSERT_TRUE(markers); // subscriber joined AFTER component construction
+  EXPECT_GT(markers->markers.size(), 5u);
+  bool has_a = false;
+  for (const auto &m : markers->markers)
+    if (m.ns == "endpoints" && std::abs(m.pose.position.x+1.) < 1e-6) has_a=true;
+  EXPECT_TRUE(has_a);
   pub->publish(map);
   pump();
   ASSERT_TRUE(received);
@@ -140,6 +152,12 @@ TEST_F(RosPassageTest, StaticMapAndLiveHeightFilteringAndGrowingMap) {
 }
 
 TEST_F(RosPassageTest, LiveCostmapResizeAndAnnotatedNarrowCenterline) {
+  auto io = std::make_shared<rclcpp::Node>("planner_diagnostic_io");
+  executor.add_node(io);
+  std_msgs::msg::String::SharedPtr diagnostic;
+  auto diagnostic_sub = io->create_subscription<std_msgs::msg::String>(
+      "passage/planner_diagnostics", rclcpp::QoS(1).reliable().transient_local(),
+      [&](std_msgs::msg::String::SharedPtr m) { diagnostic = m; });
   auto map = std::make_shared<nav2_costmap_2d::Costmap2DROS>(
       rclcpp::NodeOptions().parameter_overrides(
           {rclcpp::Parameter("plugins", std::vector<std::string>{}),
@@ -170,7 +188,7 @@ TEST_F(RosPassageTest, LiveCostmapResizeAndAnnotatedNarrowCenterline) {
   planner.deactivate();
   planner.cleanup();
   const auto filename = file("planner");
-  writeConfig(filename, 2., .4);
+  writeConfig(filename, 2., .4, true);
   auto annotated = std::make_shared<rclcpp_lifecycle::LifecycleNode>(
       "annotated_planner_test",
       rclcpp::NodeOptions().parameter_overrides(
@@ -186,15 +204,89 @@ TEST_F(RosPassageTest, LiveCostmapResizeAndAnnotatedNarrowCenterline) {
   }
   path = planner.createPlan(start, goal);
   ASSERT_FALSE(path.poses.empty());
+  pump();
+  ASSERT_TRUE(diagnostic);
+  auto report = nlohmann::json::parse(diagnostic->data);
+  EXPECT_EQ(report["selected_count"], 1);
+  EXPECT_TRUE(report["passage_checks"][0]["valid"].get<bool>());
   for (const auto &p : path.poses)
     if (p.pose.position.x > 1.75 && p.pose.position.x < 2.25)
       EXPECT_NEAR(p.pose.position.y, 0, 1e-5);
   grid->setCost(160, 80, 254); // 中线出现新的真实障碍，语义不能将它清除。
   EXPECT_THROW(planner.createPlan(start, goal), nav2_core::PlannerException);
+  pump();
+  report = nlohmann::json::parse(diagnostic->data);
+  EXPECT_FALSE(report["success"].get<bool>());
+  EXPECT_EQ(report["passage_checks"][0]["reason"].get<std::string>().find("centerline_obstacle"), 0u);
+  grid->setCost(160,80,255);
+  EXPECT_THROW(planner.createPlan(start,goal),nav2_core::PlannerException);
+  pump();
+  report=nlohmann::json::parse(diagnostic->data);
+  EXPECT_EQ(report["passage_checks"][0]["reason"].get<std::string>().find("centerline_unknown"),0u);
   planner.deactivate();
   planner.cleanup();
   map->cleanup();
   std::filesystem::remove(filename);
+  executor.remove_node(io);
+}
+
+TEST_F(RosPassageTest, ExplicitStaticUnknownOverrideIsLimitedToTheGate) {
+  const auto filename=file("static_unknown");
+  writeConfig(filename,0.,1.2,true);
+  class_loader::ClassLoader loader(PASSAGE_COMPONENT_LIBRARY);
+  auto names=loader.getAvailableClasses<rclcpp_components::NodeFactory>();
+  auto factory=loader.createInstance<rclcpp_components::NodeFactory>(names.front());
+  auto wrapper=factory->create_node_instance(rclcpp::NodeOptions().parameter_overrides(
+      {rclcpp::Parameter("passage_file",filename)}));
+  auto io=std::make_shared<rclcpp::Node>("static_unknown_test_io");
+  executor.add_node(wrapper.get_node_base_interface()); executor.add_node(io);
+  nav_msgs::msg::OccupancyGrid::SharedPtr received;
+  auto sub=io->create_subscription<nav_msgs::msg::OccupancyGrid>("passage_map",
+      rclcpp::QoS(1).reliable().transient_local(),
+      [&](nav_msgs::msg::OccupancyGrid::SharedPtr m){received=m;});
+  auto pub=io->create_publisher<nav_msgs::msg::OccupancyGrid>("map",rclcpp::QoS(1).reliable().transient_local());
+  nav_msgs::msg::OccupancyGrid m;
+  m.header.frame_id="map";m.info.resolution=.1;m.info.width=40;m.info.height=20;
+  m.info.origin.position.x=-2.;m.info.origin.position.y=-1.;m.info.origin.orientation.w=1.;
+  m.data.assign(800,-1);
+  pump();pub->publish(m);pump();ASSERT_TRUE(received);
+  EXPECT_EQ(received->data[10*40+20],0);
+  EXPECT_EQ(received->data[10*40+35],-1);
+  executor.remove_node(io);executor.remove_node(wrapper.get_node_base_interface());
+  std::filesystem::remove(filename);
+}
+
+TEST_F(RosPassageTest, MarkersPreserveWorldGeometryAndActualPreparePoint) {
+  lc_passage_nav2::PassageFile config;
+  lc_passage_nav2::PassageConfig g;
+  g.id="rotated"; g.center={7.9,-4.1}; g.yaw=.4;
+  g.a={6.9,-4.5}; g.b={8.9,-3.7}; config.passages={g};
+  lc_passage_msgs::msg::PassagePlan p;
+  p.header.frame_id=p.path.header.frame_id="map";
+  p.arc_lengths={0.,2.,5.};
+  for (const auto &xy : std::array<lc_passage_nav2::Point,3>{{{1,1},{1,3},{4,3}}}) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x=xy.x; pose.pose.position.y=xy.y;
+    p.path.poses.push_back(pose);
+  }
+  lc_passage_msgs::msg::PassageTraversal t;
+  t.passage_id=g.id; t.prepare_s=1.; t.enter_s=2.; t.exit_s=4.; t.release_s=5.;
+  p.traversals={t};
+  const auto markers=lc_passage_nav2::passageMarkers(config,p);
+  bool geometry=false,prepare=false;
+  for (const auto &m : markers.markers) {
+    EXPECT_EQ(m.header.frame_id,"map");
+    if (m.ns=="regions") {
+      geometry=true; EXPECT_DOUBLE_EQ(m.pose.position.x,7.9);
+      EXPECT_DOUBLE_EQ(m.pose.position.y,-4.1);
+      EXPECT_NEAR(m.pose.orientation.z,std::sin(.2),1e-9);
+    }
+    if (m.ns=="event_labels" && m.text.find("PREPARE")!=std::string::npos) {
+      prepare=true; EXPECT_DOUBLE_EQ(m.pose.position.x,1.);
+      EXPECT_DOUBLE_EQ(m.pose.position.y,2.);
+    }
+  }
+  EXPECT_TRUE(geometry); EXPECT_TRUE(prepare);
 }
 
 TEST_F(RosPassageTest, ControllerAdoptionAcknowledgementAndRelease) {

@@ -81,14 +81,16 @@ bool crossesRegion(const RotatedRect &r, const Vec2 &a, const Vec2 &b) {
   }
   return t1 - t0 > EPS;
 }
-void paintRegion(tdt_nav::GridMap &m, const RotatedRect &r, bool clear) {
+void paintRegion(tdt_nav::GridMap &m, const RotatedRect &r, bool clear,
+                 bool clear_unknown = false) {
   for (int y = 0; y < m.free.rows; ++y)
     for (int x = 0; x < m.free.cols; ++x) {
       if (!r.contains(m.cellCenterToWorld(x, y)))
         continue;
-      if (clear && m.unknown.at<uint8_t>(y, x))
+      if (clear && m.unknown.at<uint8_t>(y, x) && !clear_unknown)
         continue; // annotation does not invent observed free space
       m.free.at<uint8_t>(y, x) = clear ? 255 : 0;
+      if (clear && clear_unknown) m.unknown.at<uint8_t>(y, x) = 0;
       if (clear)
         m.soft.at<float>(y, x) = 0;
     }
@@ -120,20 +122,33 @@ Path densify(const Path &p, double step) {
     append(out, sampleLine(p[i - 1], p[i], step));
   return out;
 }
-bool freeLine(const tdt_nav::GridMap &map, const cv::Mat &inflated,
-              const Vec2 &a, const Vec2 &b, double step) {
+// Keep physical/unknown rejection distinct from ordinary endpoint inflation.
+// A closed gate must never silently look like an intentional cheaper detour.
+std::string lineProblem(const tdt_nav::GridMap &map, const Vec2 &a,
+                        const Vec2 &b, double step) {
   cv::Point last(-1, -1);
+  auto problem = [&](cv::Point c) -> std::string {
+    if (map.free.at<uint8_t>(c)) return {};
+    const auto p = map.cellCenterToWorld(c.x, c.y);
+    std::ostringstream s;
+    s << (map.unknown.at<uint8_t>(c) ? "centerline_unknown" : "centerline_obstacle")
+      << " at (" << std::fixed << std::setprecision(3) << p.x() << ", " << p.y() << ")";
+    return s.str();
+  };
   for (const auto &p : sampleLine(a, b, step)) {
     cv::Point c;
-    if (!map.worldToCell(p, c) || !inflated.at<uint8_t>(c))
-      return false;
-    if (last.x >= 0 && c.x != last.x && c.y != last.y &&
-        (!inflated.at<uint8_t>(last.y, c.x) ||
-         !inflated.at<uint8_t>(c.y, last.x)))
-      return false;
+    if (!map.worldToCell(p, c)) return "centerline_outside_map";
+    auto reason = problem(c);
+    if (!reason.empty()) return reason;
+    if (last.x >= 0 && c.x != last.x && c.y != last.y) {
+      for (auto corner : {cv::Point(c.x, last.y), cv::Point(last.x, c.y)}) {
+        reason = problem(corner);
+        if (!reason.empty()) return reason;
+      }
+    }
     last = c;
   }
-  return true;
+  return {};
 }
 double pathCost(const Path &path, const tdt_nav::GridMap &map,
                 const cv::Mat &cost, double speed) {
@@ -189,8 +204,8 @@ tdt_nav::GridMap prepareEnvironment(const Project &project) {
   effective.soft = project.map.soft.clone();
   for (const auto &g : project.passages) {
     validateRect(g.region);
-    if (g.clear_static)
-      paintRegion(effective, g.region, true);
+    if (g.enabled && g.clear_static)
+      paintRegion(effective, g.region, true, g.clear_unknown);
   }
   for (const auto &b : project.blockers) {
     validateRect(b);
@@ -258,6 +273,12 @@ Result Planner::plan(const Project &project, const Vec2 &start,
         return fail("invalid_project",
                     g.id + ": A and B must be outside the rectangle and their "
                            "segment must cross it");
+      const Vec2 axis = g.region.axis(), normal(-axis.y(), axis.x());
+      if (std::abs((g.a - g.region.center).dot(normal)) > .001 ||
+          std::abs((g.b - g.region.center).dot(normal)) > .001 ||
+          (g.a - g.region.center).dot(axis) *
+              (g.b - g.region.center).dot(axis) >= 0)
+        return fail("invalid_project", g.id + ": A/B must lie on opposite sides of the centreline");
       for (size_t j = 0; j < i; ++j)
         if (intersects(g.region, project.passages[j].region))
           return fail("invalid_project", "special rectangles must not overlap");
@@ -268,11 +289,19 @@ Result Planner::plan(const Project &project, const Vec2 &start,
     ordinary.soft = effective.soft.clone();
     for (const auto &g : project.passages)
       paintRegion(ordinary, g.region, false);
+    cv::Mat forbidden(effective.free.size(), CV_8UC1, cv::Scalar(0));
+    for (int y = 0; y < forbidden.rows; ++y)
+      for (int x = 0; x < forbidden.cols; ++x)
+        for (const auto &g : project.passages)
+          if (g.region.contains(effective.cellCenterToWorld(x, y))) {
+            forbidden.at<uint8_t>(y, x) = 255;
+            break;
+          }
     auto searchCfg = project.planner;
     searchCfg.optimize = false;
     searchCfg.collect_debug_images = false;
     tdt_nav::Planner search(searchCfg), safety(searchCfg);
-    search.setMap(ordinary);
+    search.setMap(effective, forbidden);
     safety.setMap(effective);
     auto normalFree = search.inflatedFree(), safeFree = safety.inflatedFree(),
          cost = search.costField();
@@ -318,17 +347,30 @@ Result Planner::plan(const Project &project, const Vec2 &start,
           continue;
         Vec2 a = rev ? g.b : g.a, b = rev ? g.a : g.b, d = (b - a).normalized(),
              release = b + d * g.release_distance;
-        bool valid = freeLine(effective, effective.free, a, release, spacing);
+        PassageCheck check;
+        check.passage_id = g.id;
+        check.direction = rev ? "b_to_a" : "a_to_b";
+        check.entry = a;
+        check.exit = b;
+        check.release = release;
+        check.cost_seconds = (release - a).norm() / g.speed + g.action_cost_seconds;
+        check.reason = lineProblem(effective, a, release, spacing);
         for (size_t j = 0; j < project.passages.size(); ++j)
           if (j != i && crossesRegion(project.passages[j].region, a, release))
-            valid = false;
-        for (const auto &p : {a, release})
-          if (!ordinary.worldToCell(p, cell) || !normalFree.at<uint8_t>(cell))
-            valid = false;
-        if (!valid) {
-          out.warnings.push_back(
-              g.id + (rev ? " B_to_A" : " A_to_B") +
-              ": crossing/connection blocked; this directed edge was excluded");
+            check.reason = "crosses_other_region: " + project.passages[j].id;
+        for (const auto &end : std::array<std::pair<Vec2, std::string>, 2>{{
+                 {a, "entry"}, {release, "release"}}}) {
+          if (!check.reason.empty()) break;
+          if (!ordinary.worldToCell(end.first, cell))
+            check.reason = end.second + "_outside_map";
+          else if (!normalFree.at<uint8_t>(cell))
+            check.reason = end.second + "_inflation_or_forbidden";
+        }
+        check.valid = check.reason.empty();
+        if (check.valid) check.reason = "available";
+        out.passage_checks.push_back(check);
+        if (!check.valid) {
+          out.warnings.push_back(g.id + " " + check.direction + ": " + check.reason);
           continue;
         }
         int from = int(out.nodes.size());
@@ -421,7 +463,7 @@ Result Planner::plan(const Project &project, const Vec2 &start,
     auto optCfg = project.planner;
     optCfg.collect_debug_images = false;
     tdt_nav::Planner optimizer(optCfg);
-    optimizer.setMap(ordinary);
+    optimizer.setMap(effective, forbidden);
     double progress = 0.;
     for (size_t ri = 0; ri < route.size(); ++ri) {
       auto &e = edges[route[ri]];
@@ -508,6 +550,12 @@ Result Planner::plan(const Project &project, const Vec2 &start,
                                 (out.path[i] - out.path[i - 1]).norm());
     out.length = out.arc_lengths.back();
     out.cost_seconds = dist[1];
+    for (auto &check : out.passage_checks)
+      for (const auto &t : out.traversals)
+        if (check.passage_id == t.passage_id && check.direction == t.direction) {
+          check.selected = true;
+          check.reason = "selected";
+        }
     for (const auto &t : out.traversals) {
       out.events.push_back(
           {t.passage_id, t.direction, "DEFORM", t.mode, t.prepare_s});
@@ -654,6 +702,7 @@ Project loadProject(const std::string &filename) {
     g.direction = v.value("direction", std::string("both"));
     g.enabled = v.value("enabled", true);
     g.clear_static = v.value("clear_static", true);
+    g.clear_unknown = v.value("clear_unknown", false);
     g.prepare_distance = v.value("prepare_distance", .8);
     g.release_distance = v.value("release_distance", .4);
     g.speed = v.value("speed", .5);
@@ -681,6 +730,12 @@ Json toJson(const Result &r) {
             {"arc_lengths", r.arc_lengths},
             {"warnings", r.warnings},
             {"stages", r.stages}};
+  j["passage_checks"] = Json::array();
+  for (const auto &c : r.passage_checks)
+    j["passage_checks"].push_back({{"passage_id", c.passage_id},
+      {"direction", c.direction}, {"valid", c.valid}, {"selected", c.selected},
+      {"reason", c.reason}, {"entry", jvec(c.entry)}, {"exit", jvec(c.exit)},
+      {"release", jvec(c.release)}, {"cost_seconds", c.cost_seconds}});
   j["events"] = Json::array();
   for (const auto &e : r.events)
     j["events"].push_back({{"passage_id", e.passage_id},

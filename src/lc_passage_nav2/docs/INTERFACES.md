@@ -2,7 +2,7 @@
 
 ## 通道文件
 
-编辑器工程 `*.json` 包含图片、地图坐标、测试参数；运行文件 `*.passages.json` 只包含 `schema_version: 1`、`frame_id` 和 `passages`。运行时也可直接读取旧版工程 JSON 的通道字段，忽略测试障碍与图片路径。地图 YAML 仍由 map_server 加载。
+编辑器工程 `*.json` 包含图片、地图坐标、测试参数；运行文件 `*.passages.json` 包含 `schema_version: 1`、`frame_id`、`passages`，新版还附带 `map_reference: {origin: [x,y], yaw: ..., resolution: ...}` 用于离线启动防错，不依赖图片。运行时也可直接读取旧版工程 JSON 的通道字段，忽略测试障碍与图片路径。地图 YAML 仍由 map_server 加载；参考元数据不匹配时启动报错，不能只改 origin 数字而不转换已有通道坐标。
 
 ```json
 {
@@ -12,7 +12,7 @@
     "id": "door_01",
     "region": {"center": [5.0, 3.0], "length": 0.8, "width": 0.6, "yaw": 0.0},
     "endpoint_a": [3.8, 3.0], "endpoint_b": [6.2, 3.0],
-    "enabled": true, "direction": "both", "clear_static": true,
+    "enabled": true, "direction": "both", "clear_static": true, "clear_unknown": false,
     "prepare_distance": 0.8, "release_distance": 0.4,
     "speed": 0.3, "mode": "folded", "action_cost_seconds": 1.0,
     "fold_hold_seconds": 0.3, "restore_hold_seconds": 0.3,
@@ -23,7 +23,7 @@
 
 坐标为 map 米制世界坐标，yaw 为弧度，时间为秒。A/B 必须在矩形长轴中线上、位于矩形外且分居两侧；编号唯一，最多 16 个不相交区域。`direction` 可为 both/a_to_b/b_to_a。准备点位于入口前的最终路径上，释放点沿中线延伸到出口后。反向通行自动交换入口与出口。
 
-`clear_static` 只清已标注矩形的已知静态占据；`beam_min_height`/`beam_max_height` 使用 terrain_analysis 计算的 intensity 相对地面高度。请按真实地图只标门梁投影，不要把邻近墙体或地面障碍一并圈入矩形。
+`clear_static` 清理已标注矩形的已知静态占据；`clear_unknown` 默认 false，设为 true 时同时清除该矩形内的静态未知，用于已确认门梁投影的中间灰度被 trinary 地图判为未知的情况。两个选项均不清除合并后的实时 costmap；禁用通道不做清理。`beam_min_height`/`beam_max_height` 使用 terrain_analysis 计算的 intensity 相对地面高度。请按真实地图只标门梁投影，不要把邻近墙体或地面障碍一并圈入矩形。
 
 ## 参数
 
@@ -33,11 +33,11 @@
 | --- | --- |
 | GridBased.robot_radius | 使用 global costmap 配置半径，仅普通区膨胀 |
 | safety_margin | 0.02 m，普通区额外距离 |
-| obstacle_weight / obstacle_decay | 2.0 / 0.35 m，距墙代价权重与衰减距离 |
+| obstacle_weight / obstacle_decay | 2.0 / 0.35 m，附加项为 weight / (decay + 障碍距离)，decay 是距离偏置 |
 | source_cost_weight | 0.5，继承 Nav2 软代价权重 |
 | unknown_is_obstacle | true |
 | optimize / allow_geometric_fallback | true / true；优化失败可用已验证几何路线 |
-| graph_budget_ms | 1000，整次图规划预算 |
+| graph_budget_ms | 1000，构建普通连接边时检查的累计预算，不是整个 createPlan 的硬超时 |
 | search_timeout_ms / optimization_timeout_ms | 200 / 200，单次后端预算 |
 | sample_spacing / cruise_speed | 0.025 m / 1.0 m/s |
 | FollowPath.enable_passage_management | true，使用候选路径采用与执行状态机 |
@@ -54,6 +54,9 @@
 | passage/plan | lc_passage_msgs/PassagePlan | 候选路径与对应弧长/通道标记，可靠且 transient_local |
 | passage/active_plan | lc_passage_msgs/PassagePlan | 控制器实际采用的完整路径 |
 | passage/state | lc_passage_msgs/PassageState | 当前阶段、锁定、变形、停车、故障状态 |
+| passage/markers | visualization_msgs/MarkerArray | 地图通道几何及最近采用路径的实际事件点，可靠且 transient_local |
+| passage/planner_markers | visualization_msgs/MarkerArray | 最近规划的通道方向检查：选中绿色、可用未选中黄色、拒绝红色 |
+| passage/planner_diagnostics | std_msgs/String | JSON：规划状态、地图原点/尺寸、实际半径、每个方向的 valid/selected/reason、完整路线代价与纯普通道路代价 |
 | passage/deformation_command | lc_passage_msgs/DeformationCommand | 请求模式 folded/normal；相同 request_id 可重发 |
 | passage/deformation_feedback | lc_passage_msgs/DeformationFeedback | 真实机构完成或故障反馈 |
 
@@ -62,3 +65,5 @@
 现有 `lc_rm_serial` 的速度帧和导航 Twist 桥没有变形字段。本次不虚构下位机二进制布局：底盘/CV 侧在已有通信程序中转换上述两个类型；`cmd_bridge.yaml` 已添加跨域命令与反馈。两个域都需要编译并 source `lc_passage_msgs`。缺少真实反馈时，导航会在准备点停车并在超时后锁存故障。
 
 `passage_deformation_simulator` 提供可执行的仿真接口，收到命令后延迟确认，默认不启动。仿真参数 `simulate_deformation:=true` 不应在实车使用。
+
+`passage_checks` 同时由独立 CLI 的结果 JSON 和 Nav2 诊断输出提供。`centerline_obstacle at (x,y)` 为中线真实占据，`centerline_unknown` 为未知，`centerline_outside_map` 为越界，`entry_inflation_or_forbidden` / `release_inflation_or_forbidden` 为普通端点未通过膨胀或语义禁行检查，`crosses_other_region` 为固定线穿越另一个特殊区域。`available` 只代表该方向固定边有效；`selected` 才代表进入最终路径。节点日志在检查结果变化时输出原因，避免每次重规划刷屏。

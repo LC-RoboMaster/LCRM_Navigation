@@ -368,6 +368,8 @@ def generate_launch_description():
     # Add the actions to launch all of the navigation nodes
     ld.add_action(DeclareLaunchArgument("simulate_deformation", default_value="false", description="Simulation only: generate mock deformation feedback"))
     ld.add_action(Node(package="lc_passage_nav2", executable="passage_deformation_simulator",
+                       # Inherit bringup's PushRosNamespace, as the Nav2 nodes do.
+                       parameters=[{"use_sim_time": use_sim_time}],
                        condition=IfCondition(LaunchConfiguration("simulate_deformation")), output="screen"))
     ld.add_action(load_nodes)
     ld.add_action(load_composable_nodes)

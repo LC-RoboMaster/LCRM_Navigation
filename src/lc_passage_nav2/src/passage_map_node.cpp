@@ -1,4 +1,5 @@
 #include "lc_passage_nav2/passage_config.hpp"
+#include "lc_passage_nav2/passage_markers.hpp"
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -19,8 +20,24 @@ namespace lc_passage_nav2
         explicit PassageMapNode(const rclcpp::NodeOptions& options)
             : Node("passage_map", options), tf_(get_clock()), listener_(tf_)
         {
-            config_ = loadPassages(declare_parameter<std::string>("passage_file", ""));
+            const auto passage_file = declare_parameter<std::string>("passage_file", "");
+            config_ = loadPassages(passage_file);
             auto qos = rclcpp::QoS(1).reliable().transient_local();
+            marker_pub_ = create_publisher<MarkerArray>("passage/markers", qos);
+            active_sub_ = create_subscription<lc_passage_msgs::msg::PassagePlan>(
+                "passage/active_plan", qos,
+                [this](lc_passage_msgs::msg::PassagePlan::ConstSharedPtr p) {
+                    active_plan_ = *p;
+                    publishMarkers();
+                });
+            state_sub_ = create_subscription<lc_passage_msgs::msg::PassageState>(
+                "passage/state", qos,
+                [this](lc_passage_msgs::msg::PassageState::ConstSharedPtr s) {
+                    state_ = *s;
+                });
+            // Durable snapshot plus periodic refresh supports RViz reconnects.
+            marker_timer_ = create_wall_timer(std::chrono::seconds(1), [this] { publishMarkers(); });
+            publishMarkers();
             map_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("passage_map", qos);
             cloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("terrain_map_nav", rclcpp::SensorDataQoS());
             map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>("map", qos, [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr input)
@@ -42,8 +59,8 @@ namespace lc_passage_nav2
                         for (unsigned x = 0; x < map.info.width; ++x)
                         {
                             auto& cell = map.data[size_t(y) * map.info.width + x];
-                            if (cell <= 0)
-                                continue; // 未知(-1)不改为空闲，保留探索边界。
+                            if (cell == 0)
+                                continue;
                             double lx = (x + .5) * map.info.resolution,
                                    ly = (y + .5) * map.info.resolution;
                             Point p{
@@ -51,7 +68,8 @@ namespace lc_passage_nav2
                                 map.info.origin.position.y + s * lx + c * ly
                             };
                             for (const auto& gate : config_.passages)
-                                if (gate.enabled && gate.clear_static && gate.contains(p))
+                                if (gate.enabled && gate.clear_static && gate.contains(p) &&
+                                    (cell > 0 || gate.clear_unknown))
                                 {
                                     cell = 0;
                                     break;
@@ -67,12 +85,19 @@ namespace lc_passage_nav2
                 });
             RCLCPP_INFO(
                 get_logger(),
-                "Passage map ready: %zu annotations (empty file = live mapping mode)",
-                config_.passages.size());
+                "Passage map ready: %zu annotations, file='%s', RViz=passage/markers",
+                config_.passages.size(), passage_file.c_str());
         }
 
     private:
         PassageFile config_;
+        lc_passage_msgs::msg::PassagePlan active_plan_;
+        lc_passage_msgs::msg::PassageState state_;
+        rclcpp::Publisher<MarkerArray>::SharedPtr marker_pub_;
+        rclcpp::Subscription<lc_passage_msgs::msg::PassagePlan>::SharedPtr active_sub_;
+        rclcpp::Subscription<lc_passage_msgs::msg::PassageState>::SharedPtr state_sub_;
+        rclcpp::TimerBase::SharedPtr marker_timer_;
+        void publishMarkers() { marker_pub_->publish(passageMarkers(config_, active_plan_, state_)); }
         tf2_ros::Buffer tf_;
         tf2_ros::TransformListener listener_;
         rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;

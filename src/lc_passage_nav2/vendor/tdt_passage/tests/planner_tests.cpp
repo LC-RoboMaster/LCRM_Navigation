@@ -79,6 +79,25 @@ int main() {
       require(stateAt(r, t.enter_s + .01).path_locked, "crossing locked");
       require(!stateAt(r, t.release_s).fold_request, "release restores normal");
     });
+    run("semantic_rectangle_does_not_inflate_into_its_own_entry", [] {
+      auto p = field();
+      p.planner.robot_radius = .25;
+      auto &g = p.passages[0];
+      // Only 15 cm from the semantic boundary, but well clear of real walls.
+      // Inflating the forbidden rectangle used to exclude this usable edge.
+      g.a = g.region.center - g.region.axis() * (g.region.length/2 + .15);
+      g.b = g.region.center + g.region.axis() * (g.region.length/2 + .15);
+      auto r = Planner().plan(p,p.map.info.toWorld({2,4}),p.map.info.toWorld({10,4}));
+      require(r.success && r.traversals.size()==1,r.message);
+      require(r.passage_checks.size()==2 && r.passage_checks[0].valid,
+              "entry remains available without clearing physical inflation");
+      require(r.passage_checks[0].selected,"selected edge is observable");
+    });
+    run("off_axis_endpoint_rejected_in_standalone_planner", [] {
+      auto p = field(); p.passages[0].a.y() += .02;
+      auto r = Planner().plan(p,p.map.info.toWorld({2,4}),p.map.info.toWorld({10,4}));
+      require(!r.success && r.status=="invalid_project","same centreline rule as Nav2");
+    });
     run("reverse_direction_and_release_side", [] {
       auto p = field();
       auto r = Planner().plan(p, p.map.info.toWorld({10, 4}),
@@ -118,6 +137,9 @@ int main() {
                               p.map.info.toWorld({10, 4}));
       require(!r.success, "dynamic blocker vetoes fixed edge");
       require(!r.warnings.empty(), "blocked edge diagnostic");
+      require(!r.passage_checks.empty() && !r.passage_checks[0].valid &&
+              r.passage_checks[0].reason.find("centerline_obstacle") == 0,
+              "physical blocker rejection is exposed");
     });
     run("map_rotation_and_origin", [] {
       auto p = field(.47);
@@ -177,6 +199,21 @@ int main() {
       auto r = Planner().plan(p, p.map.info.toWorld({2, 4}),
                               p.map.info.toWorld({10, 4}));
       require(!r.success, "unknown barrier remains unknown/blocked");
+    });
+    run("surveyed_gate_can_explicitly_clear_only_static_unknown_inside_region", [] {
+      auto p = field();
+      p.map.unknown.colRange(119,121).setTo(255);
+      p.map.free.colRange(119,121).setTo(0);
+      p.passages[0].clear_unknown = true;
+      auto environment=prepareEnvironment(p);
+      require(environment.unknown.at<uint8_t>(80,120)==0,"gate projection explicitly cleared");
+      require(environment.unknown.at<uint8_t>(20,120)==255,"unknown outside gate retained");
+      auto r=Planner().plan(p,p.map.info.toWorld({2,4}),p.map.info.toWorld({10,4}));
+      require(r.success && r.traversals.size()==1,"surveyed gate is usable");
+      p.runtime_obstacles=cv::Mat(p.map.free.size(),CV_8UC1,cv::Scalar(0));
+      p.runtime_obstacles.at<uint8_t>(80,120)=255;
+      r=Planner().plan(p,p.map.info.toWorld({2,4}),p.map.info.toWorld({10,4}));
+      require(!r.success,"live occupancy remains after the static override");
     });
     run("tracker_latches_progress_and_replacement_lock", [] {
       auto p = field();

@@ -55,7 +55,7 @@ private:
   QMap<QString, QDoubleSpinBox *> fields_, settings_, mapFields_;
   QLineEdit *id_ = nullptr, *mode_ = nullptr, *cliField_ = nullptr;
   QComboBox *direction_ = nullptr, *background_ = nullptr;
-  QCheckBox *enabled_ = nullptr, *clearStatic_ = nullptr, *optimize_ = nullptr,
+  QCheckBox *enabled_ = nullptr, *clearStatic_ = nullptr, *clearUnknown_ = nullptr, *optimize_ = nullptr,
             *fallback_ = nullptr;
   QListWidget *items_ = nullptr;
   QLabel *summary_ = nullptr, *hint_ = nullptr, *coordinate_ = nullptr,

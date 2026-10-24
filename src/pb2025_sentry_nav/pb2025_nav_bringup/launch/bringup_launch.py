@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import os
+import json
+import math
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -36,16 +39,48 @@ from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
+def validate_passage_map_reference(passage_path, map_path):
+    """离线地图防错：图片坐标原点不能冒充 map 世界坐标。
+
+    仅检查文件明确携带的参考元数据；无参考的旧语义文件保持兼容。
+    在线 SLAM 不调用此检查，扩图/移动栅格原点不会改变通道世界坐标。
+    """
+    with open(passage_path, encoding="utf-8") as stream:
+        passage = json.load(stream)
+    reference = passage.get("map_reference", passage.get("map"))
+    if not reference:
+        return
+    with open(map_path, encoding="utf-8") as stream:
+        map_info = yaml.safe_load(stream)
+    origin = map_info["origin"]
+    ref_origin = reference["origin"]
+    ref_yaw = reference.get("yaw", ref_origin[2] if len(ref_origin) > 2 else 0.0)
+    same = all(math.isclose(float(a), float(b), abs_tol=1e-6, rel_tol=0.) for a, b in [
+        (reference["resolution"], map_info["resolution"]),
+        (ref_origin[0], origin[0]), (ref_origin[1], origin[1]),
+    ]) and abs(math.remainder(float(ref_yaw) - float(origin[2]), 2 * math.pi)) < 1e-6
+    if not same:
+        raise RuntimeError(
+            f"Passage/map reference mismatch: {passage_path} has origin={ref_origin}, "
+            f"yaw={ref_yaw}, resolution={reference['resolution']}; "
+            f"{map_path} has origin={origin}, resolution={map_info['resolution']}. "
+            "Import the actual map YAML into the editor and re-export passages. "
+            "Changing JSON origin alone does not transform existing endpoints/regions."
+        )
+
+
 def resolve_passage_file(context):
     """离线地图可自动读取同名通道；建图时默认无通道，不依赖旧地图。"""
     path = LaunchConfiguration("passage_file").perform(context)
+    mapping = LaunchConfiguration("slam").perform(context).lower() == "true"
+    map_path = LaunchConfiguration("map").perform(context)
     if path == "auto":
-        mapping = LaunchConfiguration("slam").perform(context).lower() == "true"
-        map_path = LaunchConfiguration("map").perform(context)
         sidecar = os.path.splitext(os.path.abspath(map_path))[0] + ".passages.json"
         path = sidecar if not mapping and os.path.isfile(sidecar) else ""
     if path and not os.path.isfile(path):
         raise RuntimeError("Passage file does not exist: " + path)
+    if path and not mapping:
+        validate_passage_map_reference(path, map_path)
     return [SetLaunchConfiguration("passage_file", os.path.abspath(path) if path else "")]
 
 
@@ -211,6 +246,7 @@ def generate_launch_description():
                     "use_respawn": use_respawn,
                     "container_name": "nav2_container",
                     "passage_file": passage_file,
+                    "simulate_deformation": LaunchConfiguration("simulate_deformation"),
                 }.items(),
             ),
         ]
@@ -226,6 +262,7 @@ def generate_launch_description():
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(DeclareLaunchArgument("passage_file", default_value="auto", description="Editor channel JSON"))
+    ld.add_action(DeclareLaunchArgument("simulate_deformation", default_value="false", description="Simulation only: mock mechanism feedback"))
     ld.add_action(declare_slam_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_prior_pcd_file_cmd)

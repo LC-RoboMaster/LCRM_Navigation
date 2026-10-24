@@ -1,4 +1,5 @@
 #include "lc_passage_nav2/tdt_passage_planner.hpp"
+#include "lc_passage_nav2/passage_markers.hpp"
 #include <chrono>
 #include <nav2_core/exceptions.hpp>
 #include <nav2_util/node_utils.hpp>
@@ -74,10 +75,18 @@ namespace lc_passage_nav2
             p.action_cost_seconds = g.action_cost;
             p.clear_static =
                 false; // 静态清理由 passage_map 完成，不能擦除合并后的实时障碍。
+            p.clear_unknown = false; // 同样不擦除合并后的未知/实时观测。
             project_.passages.push_back(p);
         }
         plan_pub_ = node->create_publisher<lc_passage_msgs::msg::PassagePlan>(
             "passage/plan", rclcpp::QoS(32).reliable().transient_local());
+        diagnostics_pub_ = node->create_publisher<std_msgs::msg::String>(
+            "passage/planner_diagnostics", rclcpp::QoS(1).reliable().transient_local());
+        marker_pub_ = node->create_publisher<MarkerArray>(
+            "passage/planner_markers", rclcpp::QoS(1).reliable().transient_local());
+        RCLCPP_INFO(node->get_logger(),
+            "Passage planner configured: file='%s', %zu passages, radius=%.3f m, margin=%.3f m",
+            project_file_.c_str(), project_.passages.size(), c.robot_radius, c.safety_margin);
         state_sub_ = node->create_subscription<lc_passage_msgs::msg::PassageState>(
             "passage/state", rclcpp::QoS(1).reliable().transient_local(),
             [this](lc_passage_msgs::msg::PassageState::ConstSharedPtr s)
@@ -99,6 +108,8 @@ namespace lc_passage_nav2
     {
         std::lock_guard<std::mutex> lock(mutex_);
         plan_pub_->on_activate();
+        diagnostics_pub_->on_activate();
+        marker_pub_->on_activate();
         active_ = true;
     }
 
@@ -108,6 +119,8 @@ namespace lc_passage_nav2
         active_ = false;
         if (plan_pub_)
             plan_pub_->on_deactivate();
+        if (diagnostics_pub_) diagnostics_pub_->on_deactivate();
+        if (marker_pub_) marker_pub_->on_deactivate();
     }
 
     void TdtPassagePlanner::cleanup()
@@ -115,6 +128,9 @@ namespace lc_passage_nav2
         std::lock_guard<std::mutex> lock(mutex_);
         active_ = configured_ = false;
         plan_pub_.reset();
+        diagnostics_pub_.reset();
+        marker_pub_.reset();
+        last_diagnostic_state_.clear();
         state_sub_.reset();
         active_sub_.reset();
         costmap_ros_.reset();
@@ -171,6 +187,55 @@ namespace lc_passage_nav2
             auto result = tdt_passage::Planner().plan(
                 request, {start.pose.position.x, start.pose.position.y},
                 {goal.pose.position.x, goal.pose.position.y});
+            // Publish on BOTH success and failure; graph warnings used to be
+            // discarded here, hiding why a configured passage was bypassed.
+            nlohmann::json diagnostic = {
+                {"status",result.status}, {"message",result.message},
+                {"success",result.success}, {"selected_count",result.traversals.size()},
+                {"route_cost_seconds",result.cost_seconds}, {"length",result.length},
+                {"elapsed_ms",result.elapsed_ms}, {"passage_file",project_file_},
+                {"map",{{"origin",{info.origin.x(),info.origin.y()}},
+                         {"resolution",info.resolution},{"width",w},{"height",h}}},
+                {"robot_radius",request.planner.robot_radius},
+                {"safety_margin",request.planner.safety_margin},
+                {"passage_checks",nlohmann::json::array()}, {"warnings",result.warnings},
+                {"ordinary_route_cost_seconds",nullptr}};
+            for (const auto &e : result.edges)
+                if (e.kind == "ordinary" && e.from == 0 && e.to == 1)
+                    diagnostic["ordinary_route_cost_seconds"] = e.cost;
+            auto markers = emptyMarkers(global_frame_);
+            std::string summary = result.status;
+            size_t usable = 0;
+            for (const auto &c : result.passage_checks) {
+                diagnostic["passage_checks"].push_back({
+                    {"passage_id",c.passage_id},{"direction",c.direction},
+                    {"valid",c.valid},{"selected",c.selected},{"reason",c.reason},
+                    {"entry",{c.entry.x(),c.entry.y()}},{"exit",{c.exit.x(),c.exit.y()}},
+                    {"release",{c.release.x(),c.release.y()}},{"cost_seconds",c.cost_seconds}});
+                usable += c.valid;
+                summary += ";" + c.passage_id + ":" + c.direction + ":" + c.reason;
+                const auto color = !c.valid ? markerColor(1.f,.15f,.1f) :
+                    c.selected ? markerColor(.15f,1.f,.2f) : markerColor(1.f,.75f,.1f);
+                Point a{c.entry.x(),c.entry.y()}, b{c.exit.x(),c.exit.y()};
+                const Point middle{(a.x+b.x)/2,(a.y+b.y)/2};
+                markerLine(markers,global_frame_,"edge_status",a,middle,.22,color,true);
+                const double len = std::max(distance(a,b),1e-6);
+                Point label{middle.x-(b.y-a.y)/len*.3,middle.y+(b.x-a.x)/len*.3};
+                markerText(markers,global_frame_,"edge_reasons",label,.52,
+                    c.passage_id+" "+c.direction+"\n"+c.reason,color);
+            }
+            std_msgs::msg::String message;
+            message.data = diagnostic.dump();
+            diagnostics_pub_->publish(message);
+            marker_pub_->publish(markers);
+            if (summary != last_diagnostic_state_) {
+                RCLCPP_INFO(node->get_logger(),
+                    "Passage plan: %s, usable directions=%zu, selected=%zu, route cost=%.3f",
+                    result.status.c_str(),usable,result.traversals.size(),result.cost_seconds);
+                for (const auto &warning : result.warnings)
+                    RCLCPP_WARN(node->get_logger(),"%s",warning.c_str());
+                last_diagnostic_state_ = summary;
+            }
             if (!result.success)
                 throw nav2_core::PlannerException(result.status + ": " + result.message);
             lc_passage_msgs::msg::PassagePlan meta;

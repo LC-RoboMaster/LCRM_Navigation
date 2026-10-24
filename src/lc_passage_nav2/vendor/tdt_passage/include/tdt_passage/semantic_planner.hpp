@@ -24,7 +24,7 @@ struct Passage {
   RotatedRect region;
   Vec2 a = Vec2::Zero(), b = Vec2::Zero(); // ordinary-search connection points
   std::string direction = "both";          // both / a_to_b / b_to_a
-  bool enabled = true, clear_static = true;
+  bool enabled = true, clear_static = true, clear_unknown = false;
   double prepare_distance = .8, release_distance = .4;
   double speed = .5, action_cost_seconds = 1.;
   std::string mode = "folded";
@@ -63,6 +63,15 @@ struct GraphEdge {
   bool selected = false;
 };
 
+// Inspectable even when graph search fails. A usable edge need not be selected:
+// the complete route also includes ordinary-road costs and deformation cost.
+struct PassageCheck {
+  std::string passage_id, direction, reason;
+  Vec2 entry = Vec2::Zero(), exit = Vec2::Zero(), release = Vec2::Zero();
+  bool valid = false, selected = false;
+  double cost_seconds = 0.;
+};
+
 struct Result {
   bool success = false;
   std::string status = "not_planned", message;
@@ -75,6 +84,7 @@ struct Result {
   std::vector<Event> events;
   std::vector<GraphNode> nodes;
   std::vector<GraphEdge> edges;
+  std::vector<PassageCheck> passage_checks;
   std::vector<std::string> warnings;
   Json stages = Json::array();
   cv::Mat input_map, passable_map, ordinary_map, distance_image;

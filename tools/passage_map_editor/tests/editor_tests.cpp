@@ -59,9 +59,23 @@ private slots:
     d.exportPassages(dir.filePath("field.passages.json"));
     const auto j = readObject(dir.filePath("field.passages.json"));
     QVERIFY(!j.contains("map")); QVERIFY(!j.contains("blockers"));
+    QCOMPARE(j["map_reference"].toObject()["resolution"].toDouble(), .05);
     Document e; e.importPassages(dir.filePath("field.passages.json"));
     QCOMPARE(e.data["passages"], d.data["passages"]);
     QVERIFY(e.undo()); QVERIFY(e.data["passages"].toArray().isEmpty());
+  }
+  void exportRejectsOffAxisEndpointsAndImportRejectsDifferentMap() {
+    QTemporaryDir dir; Document d;
+    auto g = newPassage(rectangle(), d.data);
+    auto a = point(g["endpoint_a"]); a.ry() += .02;
+    g["endpoint_a"] = jsonPoint(a);
+    d.data["passages"] = QJsonArray{g};
+    QVERIFY_EXCEPTION_THROWN(d.exportPassages(dir.filePath("bad.json")), std::runtime_error);
+    autoEndpoints(g,d.data); d.data["passages"] = QJsonArray{g};
+    d.exportPassages(dir.filePath("valid.json"));
+    Document other; auto m = other.data["map"].toObject();
+    m["origin"] = QJsonArray{-3.58,-9.44}; other.data["map"] = m;
+    QVERIFY_EXCEPTION_THROWN(other.importPassages(dir.filePath("valid.json")), std::runtime_error);
   }
   void yamlImportAndNegate() {
     QTemporaryDir dir;

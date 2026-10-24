@@ -27,7 +27,7 @@ namespace lc_passage_nav2
         double length = 1, width = 1, yaw = 0, prepare = .8, release = .4, speed = .3,
                action_cost = 1;
         double fold_hold = .3, restore_hold = .3, beam_min = .26, beam_max = 2.;
-        bool enabled = true, clear_static = true;
+        bool enabled = true, clear_static = true, clear_unknown = false;
 
         bool contains(Point p) const
         {
@@ -88,6 +88,9 @@ namespace lc_passage_nav2
             p.mode = v.value("mode", p.mode);
             p.enabled = v.value("enabled", true);
             p.clear_static = v.value("clear_static", true);
+            // Explicit annotation override for a surveyed gate's grey/static
+            // unknown projection. Never applies to the merged live costmap.
+            p.clear_unknown = v.value("clear_unknown", false);
             p.prepare = v.value("prepare_distance", p.prepare);
             p.release = v.value("release_distance", p.release);
             p.speed = v.value("speed", p.speed);

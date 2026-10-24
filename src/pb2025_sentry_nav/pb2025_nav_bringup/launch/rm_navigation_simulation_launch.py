@@ -160,7 +160,8 @@ def generate_launch_description():
         launch_arguments={
             "namespace": namespace,
             "slam": slam,
-                "passage_file": LaunchConfiguration("passage_file"),
+            "passage_file": LaunchConfiguration("passage_file"),
+            "simulate_deformation": LaunchConfiguration("simulate_deformation"),
             "map": map_yaml_file,
             "prior_pcd_file": prior_pcd_file,
             "use_sim_time": use_sim_time,
@@ -184,6 +185,7 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(DeclareLaunchArgument("passage_file", default_value="auto", description="Absolute channel JSON exported by passage_map_editor"))
+    ld.add_action(DeclareLaunchArgument("simulate_deformation", default_value="false", description="Generate simulated mechanism completion feedback"))
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_slam_cmd)
     ld.add_action(declare_world_cmd)
