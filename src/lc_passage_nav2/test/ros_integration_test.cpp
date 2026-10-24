@@ -329,8 +329,19 @@ TEST_F(RosPassageTest, ControllerAdoptionAcknowledgementAndRelease) {
   pump();
   plans->publish(p);
   pump();
-  EXPECT_EQ(controller.step({0, 0}, 0, 0).phase, "APPROACH");
-  auto out = controller.step({1, 0}, 0, 0);
+  auto out = controller.step({0, 0}, 2., 0);
+  EXPECT_EQ(out.phase, "APPROACH");
+  EXPECT_TRUE(std::isinf(out.speed_limit));
+  EXPECT_FALSE(out.stop);
+  out = controller.step({.95, 0}, 1., 0);
+  EXPECT_EQ(out.phase, "APPROACH");
+  EXPECT_TRUE(std::isinf(out.speed_limit));
+  EXPECT_FALSE(out.stop);
+  EXPECT_DOUBLE_EQ(out.target_limit, t.prepare_s);
+  out = controller.step({1, 0}, 1., 0);
+  EXPECT_TRUE(out.stop);
+  EXPECT_FALSE(controller.locked());
+  out = controller.step({1, 0}, 0, 0);
   ASSERT_EQ(out.phase, "WAIT_FOLD");
   ASSERT_TRUE(controller.locked());
   lc_passage_msgs::msg::DeformationFeedback ack;
@@ -343,7 +354,9 @@ TEST_F(RosPassageTest, ControllerAdoptionAcknowledgementAndRelease) {
   ack.request_id = out.request_id;
   feedback->publish(ack);
   pump();
-  EXPECT_EQ(controller.step({1, 0}, 0, 0).phase, "PASSING");
+  out = controller.step({1, 0}, 0, 0);
+  EXPECT_EQ(out.phase, "PASSING");
+  EXPECT_DOUBLE_EQ(out.speed_limit, t.speed);
   for (int i = 2; i <= 5; ++i)
     out = controller.step({double(i), 0}, 0, 0);
   ASSERT_EQ(out.phase, "WAIT_RESTORE");
@@ -355,6 +368,7 @@ TEST_F(RosPassageTest, ControllerAdoptionAcknowledgementAndRelease) {
   EXPECT_EQ(out.phase, "NORMAL");
   EXPECT_FALSE(out.locked);
   EXPECT_FALSE(out.folded);
+  EXPECT_TRUE(std::isinf(out.speed_limit));
   executor.remove_node(io);
   executor.remove_node(node->get_node_base_interface());
 }

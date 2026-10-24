@@ -23,6 +23,8 @@
 
 坐标为 map 米制世界坐标，yaw 为弧度，时间为秒。A/B 必须在矩形长轴中线上、位于矩形外且分居两侧；编号唯一，最多 16 个不相交区域。`direction` 可为 both/a_to_b/b_to_a。准备点位于入口前的最终路径上，释放点沿中线延伸到出口后。反向通行自动交换入口与出口。
 
+`speed` 单位为 m/s，仅限制 `PASSING`（准备点变形确认后至释放点）的平移速度，不要求 PID 达到该速度。洞外接近准备点与两个独立通道之间不套用通道限速，也不叠加专用接近制动包络；普通 PID 和其他已有约束继续控制速度。准备点仍需停车并确认变形完成，释放点仍需停车并确认恢复完成。连续通道合并穿越时使用该组最小 `speed`。
+
 `clear_static` 清理已标注矩形的已知静态占据；`clear_unknown` 默认 false，设为 true 时同时清除该矩形内的静态未知，用于已确认门梁投影的中间灰度被 trinary 地图判为未知的情况。两个选项均不清除合并后的实时 costmap；禁用通道不做清理。`beam_min_height`/`beam_max_height` 使用 terrain_analysis 计算的 intensity 相对地面高度。请按真实地图只标门梁投影，不要把邻近墙体或地面障碍一并圈入矩形。
 
 ## 参数
@@ -43,7 +45,7 @@
 | FollowPath.enable_passage_management | true，使用候选路径采用与执行状态机 |
 | FollowPath.passage_stop_tolerance | 0.04 m |
 | FollowPath.passage_action_timeout | 8.0 s，变形完成超时 |
-| FollowPath.passage_deceleration | 0.8 m/s²，接近标志点的制动限速 |
+| FollowPath.passage_deceleration | 0.8 m/s²，仅 PASSING 末尾接近释放点的制动限速，不作用于洞外接近准备点 |
 
 ## 主题和底盘对接
 

@@ -168,11 +168,8 @@ namespace lc_passage_nav2
                 out_.phase = "APPROACH";
                 out_.target_limit = t.prepare;
                 const double remaining = std::max(0., t.prepare - out_.progress);
-                out_.speed_limit = std::min(
-                    t.speed,
-                    std::sqrt(2 * deceleration *
-                        std::max(remaining, distance(robot, plan_.at(t.prepare)) -
-                                 stop_tolerance * .5)));
+                // 洞外只把准备点作为当前跟踪终点，由普通 PID 和现有限速控制。
+                // 不在这里施加通道 speed 或额外制动包络；通道限速仅在 PASSING 生效。
                 if (remaining <= stop_tolerance &&
                     distance(robot, plan_.at(t.prepare)) <= stop_tolerance)
                 {
@@ -224,6 +221,8 @@ namespace lc_passage_nav2
             }
             if (out_.phase == "PASSING")
             {
+                // 变形确认后至释放点为一次穿越；连续通道组采用最小通道速度。
+                // 制动包络仅用于本次穿越末尾停稳，不影响洞外普通接近路段。
                 const double release = plan_.traversals[group_end_].release;
                 out_.target_limit = release;
                 for (size_t i = index_; i <= group_end_; ++i)
