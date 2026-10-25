@@ -1,0 +1,8 @@
+string number
+string type
+float32 distance_to_image_center
+float32 distance_to_camera_center
+geometry_msgs/Pose pose
+float32 yaw_raw
+float32 yaw_best
+float64[16] measurement_covariance
