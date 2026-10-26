@@ -1,0 +1,79 @@
+{
+    "blockers": [
+    ],
+    "map": {
+        "allow_unknown": false,
+        "frame_id": "map",
+        "free_min": 192,
+        "image": "scans.passages_map.png",
+        "negate": false,
+        "occupied_max": 89,
+        "origin": [
+            -3.48,
+            -9.64
+        ],
+        "resolution": 0.05,
+        "yaw": 0
+    },
+    "passages": [
+        {
+            "action_cost_seconds": 1,
+            "auto_endpoints": true,
+            "beam_max_height": 2,
+            "beam_min_height": 0.26,
+            "clear_static": true,
+            "direction": "both",
+            "enabled": true,
+            "endpoint_a": [
+                6.8132136118347715,
+                -4.737754188729371
+            ],
+            "endpoint_b": [
+                8.985867469246308,
+                -3.685627192652012
+            ],
+            "fold_hold_seconds": 0.3,
+            "id": "passage_01",
+            "mode": "folded",
+            "prepare_distance": 0.8,
+            "region": {
+                "center": [
+                    7.89954054054054,
+                    -4.211690690690691
+                ],
+                "length": 1.774,
+                "width": 0.98,
+                "yaw": 0.4509756254228148
+            },
+            "release_distance": 0.4,
+            "restore_hold_seconds": 0.3,
+            "speed": 2
+        }
+    ],
+    "planner": {
+        "allow_geometric_fallback": true,
+        "corridor_range": 0.5,
+        "cruise_speed": 1,
+        "graph_budget_ms": 15000,
+        "max_acceleration": 2,
+        "max_speed": 2,
+        "obstacle_decay": 0.1,
+        "obstacle_weight": 0.5,
+        "optimization_iterations": 8,
+        "optimize": true,
+        "robot_radius": 0.15,
+        "safety_margin": 0.02,
+        "sample_spacing": 0.025
+    },
+    "schema_version": 1,
+    "test": {
+        "goal": [
+            14.879999999999999,
+            -1.8150000000000004
+        ],
+        "start": [
+            1.962123419007999,
+            -1.7598679176862104
+        ]
+    }
+}

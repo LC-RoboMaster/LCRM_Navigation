@@ -11,8 +11,7 @@
 
 namespace lc_passage_nav2
 {
-    // 此类由 PID 控制器持有。没有独立的“变形管理节点”，也不在标量 PID
-    // 中做状态判断。
+    // 此类由 PID 控制器持有。没有独立的“变形管理节点”，也不在标量 PID 中做状态判断。
     class PassageController
     {
     public:

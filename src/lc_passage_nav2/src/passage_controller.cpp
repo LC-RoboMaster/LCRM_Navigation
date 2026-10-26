@@ -38,27 +38,27 @@ namespace lc_passage_nav2
             return p;
         }
     } // namespace
-    PassageController::PassageController(
-        const rclcpp_lifecycle::LifecycleNode::SharedPtr& node,
-        const std::string& prefix)
-        : node_(node)
+    PassageController::PassageController(const rclcpp_lifecycle::LifecycleNode::SharedPtr& node,
+                                         const std::string& prefix) : node_(node)
     {
-        nav2_util::declare_parameter_if_not_declared(
-            node, prefix + ".passage_file", rclcpp::ParameterValue(std::string("")));
-        config_ =
-            loadPassages(node->get_parameter(prefix + ".passage_file").as_string());
+        nav2_util::declare_parameter_if_not_declared(node, prefix + ".passage_file",
+                                                     rclcpp::ParameterValue(std::string("")));
+        config_ = loadPassages(node->get_parameter(prefix + ".passage_file").as_string());
         auto param = [&](const std::string& key, double fallback, double& v)
         {
             nav2_util::declare_parameter_if_not_declared(
                 node, prefix + "." + key, rclcpp::ParameterValue(fallback));
             node->get_parameter(prefix + "." + key, v);
         };
+
         param("passage_stop_tolerance", .04, execution_.stop_tolerance);
         param("passage_action_timeout", 8., execution_.action_timeout);
         param("passage_deceleration", .8, execution_.deceleration);
-        if (execution_.stop_tolerance <= 0 || execution_.action_timeout <= 0 ||
-            execution_.deceleration <= 0)
+        if (execution_.stop_tolerance <= 0 || execution_.action_timeout <= 0 || execution_.deceleration <= 0)
+        {
             throw std::runtime_error("Invalid passage controller parameters");
+        }
+
         auto qos = rclcpp::QoS(1).reliable().transient_local();
         state_pub_ = node->create_publisher<lc_passage_msgs::msg::PassageState>(
             "passage/state", qos);

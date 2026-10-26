@@ -23,6 +23,7 @@ namespace lc_passage_nav2
             const auto passage_file = declare_parameter<std::string>("passage_file", "");
             config_ = loadPassages(passage_file);
             auto qos = rclcpp::QoS(1).reliable().transient_local();
+            //debug
             marker_pub_ = create_publisher<MarkerArray>("passage/markers", qos);
             active_sub_ = create_subscription<lc_passage_msgs::msg::PassagePlan>(
                 "passage/active_plan", qos,

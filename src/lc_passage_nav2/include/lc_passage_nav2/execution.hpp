@@ -7,22 +7,33 @@
 
 namespace lc_passage_nav2
 {
+    //通道对象
     struct Traversal
     {
-        std::string id, direction, mode = "folded";
-        double prepare = 0, enter = 0, exit = 0, release = 0, speed = .3,
-               fold_hold = .3, restore_hold = .3;
+        std::string id, direction, mode = "folded"; //通道编号，通行方向
+
+        double prepare = 0; // 准备动作点弧长
+        double enter = 0; // 入口弧长
+        double exit = 0; // 出口弧长
+        double release = 0; // 释放点弧长
+        double speed = .3; // 穿越速度上限
+        double fold_hold = .3;
+        double restore_hold = .3;
     };
 
     struct ExecutionPlan
     {
-        std::string id;
-        std::vector<Point> points;
-        std::vector<double> arcs;
-        std::vector<Traversal> traversals;
+        std::string id; // 当前执行的路径编号
+        std::vector<Point> points; // 完整路径点
+        std::vector<double> arcs; // 每个路径点对应的累计弧长
+        std::vector<Traversal> traversals; // 这条路径需要执行的通道穿越安排
 
+        /**
+         * @brief 合法性检查
+         */
         void validate() const
         {
+            // 非空检查，路径点和弧长点数量是否相等
             if (id.empty() || points.empty() || points.size() != arcs.size())
                 throw std::runtime_error("Invalid annotated path");
             double previous = -1.;
@@ -53,6 +64,11 @@ namespace lc_passage_nav2
             }
         }
 
+        /**
+         * @brief 计算路径当前弧长对应的坐标
+         * @param s 路径上的弧长
+         * @return  对应弧长的地图坐标
+         */
         Point at(double s) const
         {
             if (points.empty())
@@ -71,31 +87,84 @@ namespace lc_passage_nav2
         }
     };
 
+    // 态机当前执行到哪一步，以及本周期给控制器的要求
     struct ExecutionOutput
     {
-        std::string phase = "NORMAL", passage_id, request_id, request_mode;
-        double progress = 0, target_limit = std::numeric_limits<double>::infinity(),
-               speed_limit = std::numeric_limits<double>::infinity();
-        bool stop = false, locked = false, folded = false, fault = false,
-             intentional_wait = false;
+        std::string phase = "NORMAL"; // 当前阶段
+        std::string passage_id; // 当前通道编号
+        std::string request_id; // 当前动作请求编号
+        std::string request_mode; // 请求 folded 或 normal
+
+        double progress = 0; // 当前路径进度，单位 m
+
+        double target_limit =
+            std::numeric_limits<double>::infinity(); //控制器前视目标允许到达的最远弧长距离
+
+        double speed_limit =
+            std::numeric_limits<double>::infinity(); //本周期状态机施加平移速度上限
+
+        bool stop = false;
+        bool locked = false;
+        bool folded = false;
+        bool fault = false;
+        bool intentional_wait = false;
     };
 
     class Execution
     {
     public:
-        double stop_tolerance = .04, stopped_speed = .03, action_timeout = 8.,
-               deceleration = .8;
-        bool hasPlan() const { return !plan_.points.empty(); }
-        const ExecutionPlan& plan() const { return plan_; }
-        const ExecutionOutput& output() const { return out_; }
-        // 同一路径重发不重置状态；变形请求后不允许异步重规划覆盖正在执行的通道。
+        double stop_tolerance = .04; //到路标点判断范围
+        double stopped_speed = .03; //实际速度低于此值认为停止
+        double action_timeout = 8.; //等待机器人动作执行完成超时时间
+        double deceleration = .8;
+
+        /**
+         * @brief 检查路径是否为空
+         * @return bool是否为空
+         */
+        bool hasPlan() const
+        {
+            return !plan_.points.empty();
+        }
+
+        /**
+         * @brief 获取路径
+         * @return ExecutionPlan路径
+         */
+        const ExecutionPlan& plan() const
+        {
+            return plan_;
+        }
+
+        /**
+         * @brief 当前状态查询
+         * @return ExecutionOutput
+         */
+        const ExecutionOutput& output() const
+        {
+            return out_;
+        }
+
+        /**
+         * @brief 绑定新的路径计划
+         * @param p 需要绑定的计划
+         * @return  是否替换成功
+         */
         bool bind(ExecutionPlan p)
         {
+            //检查是否合法
             p.validate();
+            //如果是一样的路径，接受并返回true
             if (p.id == plan_.id)
+            {
                 return true;
+            }
+            //如果当前状态锁定，拒绝接受新计划
             if (out_.locked)
+            {
                 return false;
+            }
+            //接受新计划，重置状态
             plan_ = std::move(p);
             out_ = ExecutionOutput{};
             index_ = 0;
@@ -105,14 +174,25 @@ namespace lc_passage_nav2
             return true;
         }
 
-        void feedback(const std::string& id, const std::string& mode, bool completed,
-                      bool fault,
+        /**
+         * @brief 接收动作执行反馈
+         * @param id 动作请求ID
+         * @param mode 请求的模式
+         * @param completed 是否完成
+         * @param fault 是否失败
+         * @param now 当前时间
+         */
+        void feedback(const std::string& id, const std::string& mode, bool completed, bool fault,
                       double now = std::numeric_limits<double>::quiet_NaN())
         {
             if (id != out_.request_id || mode != out_.request_mode || id.empty())
+            {
                 return;
+            }
             if (fault)
+            {
                 fail();
+            }
             else if (completed && !ack_)
             {
                 ack_ = true;
@@ -129,9 +209,17 @@ namespace lc_passage_nav2
             out_.intentional_wait = false;
         }
 
-        ExecutionOutput tick(Point robot, double speed, double angular_speed,
-                             double now)
+        /**
+         *
+         * @param robot 当前机器人位置
+         * @param speed 机器人平移速度大小
+         * @param angular_speed 机器人角速度
+         * @param now 当前时间
+         * @return ExecutionOutput
+         */
+        ExecutionOutput tick(Point robot, double speed, double angular_speed, double now)
         {
+            //检查参数
             if (!hasPlan())
                 return out_;
             if (!std::isfinite(now) || !std::isfinite(speed) ||
@@ -148,9 +236,13 @@ namespace lc_passage_nav2
                 return out_;
             }
             previous_time_ = now;
+            //跟新路径进度
             project(robot);
             if (out_.fault)
+            {
                 return out_;
+            }
+            //重新初始化本周期的临时控制约束
             out_.stop = false;
             out_.intentional_wait = false;
             out_.speed_limit = std::numeric_limits<double>::infinity();
@@ -197,9 +289,7 @@ namespace lc_passage_nav2
                     fail();
                     return out_;
                 }
-                double hold = out_.phase == "WAIT_FOLD"
-                                  ? t.fold_hold
-                                  : plan_.traversals[group_end_].restore_hold;
+                double hold = out_.phase == "WAIT_FOLD" ? t.fold_hold : plan_.traversals[group_end_].restore_hold;
                 if (speed > stopped_speed || std::abs(angular_speed) > .05)
                     stopped_since_ = now;
                 if (ack_ && now - std::max(stopped_since_, acknowledged_at_) >= hold)
@@ -252,14 +342,24 @@ namespace lc_passage_nav2
         }
 
     private:
-        ExecutionPlan plan_;
-        ExecutionOutput out_;
-        size_t index_ = 0, group_end_ = 0;
-        uint64_t sequence_ = 0;
-        double action_started_ = 0, stopped_since_ = 0, previous_time_ = -1,
-               acknowledged_at_ = 0;
-        bool ack_ = false;
+        ExecutionPlan plan_; //当前采用的完整路径计划
+        ExecutionOutput out_; //当前执行结果
 
+        size_t index_ = 0; //当前待处理通道在traversals中的下标
+        size_t group_end_ = 0; //本次连续穿越通道组的最后一个下标
+
+        uint64_t sequence_ = 0; //动作请求序号，用来生成不同的request_id
+        double action_started_ = 0; //当前动作请求开始的时间
+        double stopped_since_ = 0;
+        double previous_time_ = -1; //上一次tick()的时间
+        double acknowledged_at_ = 0; //首次收到当前动作成功反馈的时间
+        bool ack_ = false; //当前动作是否已经收到成功的确认
+
+        /**
+         * @brief 准备一次新的机械动作请求
+         * @param mode 请求模式
+         * @param now 请求时间
+         */
         void request(const std::string& mode, double now)
         {
             out_.request_id = plan_.id + ":" + std::to_string(++sequence_);
@@ -268,20 +368,26 @@ namespace lc_passage_nav2
             action_started_ = stopped_since_ = now;
         }
 
+        /**
+         *
+         * @param p 将当前机器人位置转换为路径进度
+         */
         void project(Point p)
         {
             // 局部弧长窗口避免路径折返、自交或定位跳变时提前触发出口事件。
-            double best = std::numeric_limits<double>::infinity(), s = out_.progress;
+            double best = std::numeric_limits<double>::infinity();
+            double s = out_.progress;
             for (size_t i = 1; i < plan_.points.size(); ++i)
             {
-                if (plan_.arcs[i] < out_.progress - .1 ||
-                    plan_.arcs[i - 1] > out_.progress + 1.)
+                if (plan_.arcs[i] < out_.progress - 0.1 || plan_.arcs[i - 1] > out_.progress + 1.0)
+                {
                     continue;
-                auto a = plan_.points[i - 1], b = plan_.points[i];
+                }
+                auto a = plan_.points[i - 1];
+                auto b = plan_.points[i];
                 double dx = b.x - a.x, dy = b.y - a.y;
-                double u = std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) /
-                                      std::max(1e-12, dx * dx + dy * dy),
-                                      0., 1.);
+                double u = std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / std::max(1e-12, dx * dx + dy * dy),
+                                      0.0, 1.0);
                 double d = distance(p, {a.x + u * dx, a.y + u * dy});
                 if (d < best)
                 {
@@ -295,7 +401,9 @@ namespace lc_passage_nav2
                 return;
             }
             if (best < .5)
+            {
                 out_.progress = std::max(out_.progress, s);
+            }
         }
     };
 } // namespace lc_passage_nav2
