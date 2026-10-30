@@ -1,5 +1,5 @@
 #pragma once
-#include "lc_passage_nav2/passage_config.hpp"
+#include "lc_passage_common/passage_config.hpp"
 #include <lc_passage_msgs/msg/passage_plan.hpp>
 #include <lc_passage_msgs/msg/passage_state.hpp>
 #include <mutex>
@@ -12,6 +12,7 @@
 
 namespace lc_passage_nav2
 {
+    using lc_passage_common::PassageFile;
     class TdtPassagePlanner : public nav2_core::GlobalPlanner
     {
     public:

@@ -1,5 +1,5 @@
-#include "lc_passage_nav2/passage_config.hpp"
-#include "lc_passage_nav2/passage_markers.hpp"
+#include "lc_passage_map/beam_filter.hpp"
+#include "lc_passage_map/passage_markers.hpp"
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -10,8 +10,9 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
-namespace lc_passage_nav2
+namespace lc_passage_map
 {
+    using lc_passage_common::loadPassages;
     // 保留 /map 给定位、保存地图使用。只有导航的静态层订阅 /passage_map。
     // 静态层与实时观测分开处理，绝不在合并后的 master costmap 上擦除矩形。
     class PassageMapNode : public rclcpp::Node
@@ -152,5 +153,5 @@ namespace lc_passage_nav2
             }
         }
     };
-} // namespace lc_passage_nav2
-RCLCPP_COMPONENTS_REGISTER_NODE(lc_passage_nav2::PassageMapNode)
+} // namespace lc_passage_map
+RCLCPP_COMPONENTS_REGISTER_NODE(lc_passage_map::PassageMapNode)

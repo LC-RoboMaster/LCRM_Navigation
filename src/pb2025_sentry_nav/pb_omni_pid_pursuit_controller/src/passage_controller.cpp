@@ -1,8 +1,9 @@
-#include "lc_passage_nav2/passage_controller.hpp"
+#include "pb_omni_pid_pursuit_controller/passage_controller.hpp"
 #include <nav2_util/node_utils.hpp>
 
-namespace lc_passage_nav2
+namespace pb_omni_pid_pursuit_controller
 {
+    using lc_passage_common::loadPassages;
     double PassageController::steadyNow()
     {
         return std::chrono::duration<double>(
@@ -315,4 +316,4 @@ namespace lc_passage_nav2
             command_pub_->publish(c);
         }
     }
-} // namespace lc_passage_nav2
+} // namespace pb_omni_pid_pursuit_controller

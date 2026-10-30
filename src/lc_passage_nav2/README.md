@@ -1,5 +1,7 @@
 # LCRM 通道导航
 
+包拆分后的源码位置见 [过洞代码归属](../../docs/passage_packages.md)。本包只构建全局规划插件及其离线工具；状态机位于 PID 控制器包，地图和模拟反馈各有独立节点包。
+
 ROS 2 Humble / Nav2 全局规划插件，普通区域复用 TDT 的代价 A*、安全走廊和 OSQP 后端，特殊区域通过带方向的图边连接，最终路径中的通道段固定为中线直线。Qt 编辑器位于仓库 `tools/passage_map_editor`，没有 ROS 或规划库链接依赖。
 
 ## 两种地图模式
@@ -56,7 +58,7 @@ ros2 topic echo /red_standard_robot1/passage/active_plan --field traversals --on
 在现有工作空间中按原方式 `colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release`。新增依赖为 `lc_passage_msgs`、Eigen、OpenCV core/imgproc、nlohmann-json、BehaviorTree.CPP v3；OSQP、OsqpEigen 和 QDLDL 已随源码提供，构建不下载求解器。系统依赖可由 `rosdep install --from-paths src --ignore-src -r -y` 安装。
 
 ```bash
-colcon test --packages-select lc_passage_nav2 --event-handlers console_direct+
+colcon test --packages-select lc_passage_common lc_passage_map lc_passage_checkers lc_passage_nav2 pb_omni_pid_pursuit_controller --event-handlers console_direct+
 colcon test-result --verbose
 ```
 

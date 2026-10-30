@@ -19,7 +19,8 @@ add_test(NAME costmap_snapshot COMMAND costmap_snapshot_tests)
 add_executable(passage_export_nav2_map ../src/export_nav2_map.cpp)
 target_link_libraries(passage_export_nav2_map PRIVATE tdt_passage)
 
-add_executable(passage_execution_tests execution_tests.cpp)
-target_include_directories(passage_execution_tests PRIVATE ../include)
-target_link_libraries(passage_execution_tests nlohmann_json::nlohmann_json)
-add_test(NAME passage_execution COMMAND passage_execution_tests)
+
+add_executable(passage_simulation_map_test simulation_map_test.cpp)
+target_link_libraries(passage_simulation_map_test PRIVATE tdt_passage)
+add_test(NAME passage_simulation_map COMMAND passage_simulation_map_test
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/simulation_project.json)

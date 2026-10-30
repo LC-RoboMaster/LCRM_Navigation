@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(passage_execution_native LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+enable_testing()
+add_executable(passage_execution_tests execution_tests.cpp)
+target_include_directories(passage_execution_tests PRIVATE ../include ../../../lc_passage_common/include)
+add_test(NAME passage_execution COMMAND passage_execution_tests)

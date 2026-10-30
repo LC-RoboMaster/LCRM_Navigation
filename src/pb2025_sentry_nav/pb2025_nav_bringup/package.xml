@@ -39,6 +39,10 @@
     <build_type>ament_cmake</build_type>
   </export>
   <exec_depend>lc_passage_nav2</exec_depend>
+  <exec_depend>lc_passage_map</exec_depend>
+  <exec_depend>lc_passage_simulator</exec_depend>
+  <exec_depend>lc_passage_checkers</exec_depend>
+  <exec_depend>lc_passage_bt_plugins</exec_depend>
   <exec_depend>lc_passage_msgs</exec_depend>
 </package>
 

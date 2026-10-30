@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lc_passage_common</name>
+  <version>1.0.0</version>
+  <description>Shared passage geometry, configuration and marker primitives.</description>
+  <maintainer email="yyj051101@outlook.com">HBUT LC RoboMaster</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>nlohmann-json-dev</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

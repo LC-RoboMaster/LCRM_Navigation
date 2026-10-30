@@ -1,5 +1,5 @@
 #include "lc_passage_nav2/tdt_passage_planner.hpp"
-#include "lc_passage_nav2/passage_markers.hpp"
+#include "lc_passage_common/marker_utils.hpp"
 #include <chrono>
 #include <nav2_core/exceptions.hpp>
 #include <nav2_util/node_utils.hpp>
@@ -7,6 +7,15 @@
 
 namespace lc_passage_nav2
 {
+    using lc_passage_common::Point;
+    using lc_passage_common::distance;
+    using lc_passage_common::loadPassages;
+    using lc_passage_common::MarkerArray;
+    using lc_passage_common::emptyMarkers;
+    using lc_passage_common::markerColor;
+    using lc_passage_common::markerLine;
+    using lc_passage_common::markerText;
+
     void TdtPassagePlanner::configure(
         const rclcpp_lifecycle::LifecycleNode::WeakPtr& parent, std::string name,
         std::shared_ptr<tf2_ros::Buffer> tf,

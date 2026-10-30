@@ -9,7 +9,7 @@
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-namespace lc_passage_nav2
+namespace lc_passage_checkers
 {
     class StateReader
     {
@@ -132,9 +132,9 @@ namespace lc_passage_nav2
             return true;
         }
     };
-} // namespace lc_passage_nav2
-PLUGINLIB_EXPORT_CLASS(lc_passage_nav2::PassageProgressChecker,
+} // namespace lc_passage_checkers
+PLUGINLIB_EXPORT_CLASS(lc_passage_checkers::PassageProgressChecker,
                        nav2_core::ProgressChecker)
 
-PLUGINLIB_EXPORT_CLASS(lc_passage_nav2::PassageGoalChecker,
+PLUGINLIB_EXPORT_CLASS(lc_passage_checkers::PassageGoalChecker,
                        nav2_core::GoalChecker)

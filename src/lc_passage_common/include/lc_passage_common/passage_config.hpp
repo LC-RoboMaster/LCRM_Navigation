@@ -1,5 +1,6 @@
 #pragma once
 // 通道文件只保存世界坐标语义，不依赖地图像素尺寸，SLAM 扩图后仍可使用。
+#include "lc_passage_common/geometry.hpp"
 #include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -8,18 +9,8 @@
 #include <string>
 #include <vector>
 
-namespace lc_passage_nav2
+namespace lc_passage_common
 {
-    struct Point
-    {
-        double x = 0, y = 0;
-    };
-
-    inline double distance(Point a, Point b)
-    {
-        return std::hypot(a.x - b.x, a.y - b.y);
-    }
-
     struct PassageConfig
     {
         std::string id, direction = "both", mode = "folded";
@@ -162,13 +153,4 @@ namespace lc_passage_nav2
         return out;
     }
 
-    // 仅对标注的梁高区间进行实时点云过滤，地面和低矮物体始终保留。
-    inline bool isBeam(const PassageFile& f, Point p, double relative_height)
-    {
-        for (const auto& gate : f.passages)
-            if (gate.enabled && gate.clear_static && gate.contains(p) &&
-                relative_height >= gate.beam_min && relative_height <= gate.beam_max)
-                return true;
-        return false;
-    }
-} // namespace lc_passage_nav2
+} // namespace lc_passage_common

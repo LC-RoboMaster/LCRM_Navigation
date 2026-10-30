@@ -1,12 +1,19 @@
 #pragma once
 // 无 ROS 的控制状态机，便于离线回放、单元测试及移植到其他控制器。
-#include "lc_passage_nav2/passage_config.hpp"
+#include "lc_passage_common/geometry.hpp"
+#include <cmath>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <vector>
 #include <algorithm>
 #include <limits>
 #include <utility>
 
-namespace lc_passage_nav2
+namespace pb_omni_pid_pursuit_controller
 {
+    using lc_passage_common::Point;
+    using lc_passage_common::distance;
     //通道对象
     struct Traversal
     {
@@ -406,4 +413,4 @@ namespace lc_passage_nav2
             }
         }
     };
-} // namespace lc_passage_nav2
+} // namespace pb_omni_pid_pursuit_controller

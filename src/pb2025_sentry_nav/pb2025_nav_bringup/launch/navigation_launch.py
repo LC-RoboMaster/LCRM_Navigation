@@ -118,7 +118,7 @@ def generate_launch_description():
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(["not ", use_composition])),
         actions=[
-            Node(package="lc_passage_nav2", executable="passage_map_node", name="passage_map",
+            Node(package="lc_passage_map", executable="passage_map_node", name="passage_map",
                  output="screen", parameters=[configured_params], respawn=use_respawn),
             Node(
                 package="loam_interface",
@@ -257,7 +257,7 @@ def generate_launch_description():
         condition=IfCondition(use_composition),
         target_container=container_name_full,
         composable_node_descriptions=[
-            ComposableNode(package="lc_passage_nav2", plugin="lc_passage_nav2::PassageMapNode",
+            ComposableNode(package="lc_passage_map", plugin="lc_passage_map::PassageMapNode",
                            name="passage_map", parameters=[configured_params]),
             ComposableNode(
                 package="loam_interface",
@@ -367,7 +367,7 @@ def generate_launch_description():
     ld.add_action(declare_log_level_cmd)
     # Add the actions to launch all of the navigation nodes
     ld.add_action(DeclareLaunchArgument("simulate_deformation", default_value="false", description="Simulation only: generate mock deformation feedback"))
-    ld.add_action(Node(package="lc_passage_nav2", executable="passage_deformation_simulator",
+    ld.add_action(Node(package="lc_passage_simulator", executable="passage_deformation_simulator",
                        # Inherit bringup's PushRosNamespace, as the Nav2 nodes do.
                        parameters=[{"use_sim_time": use_sim_time}],
                        condition=IfCondition(LaunchConfiguration("simulate_deformation")), output="screen"))

@@ -6,7 +6,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-namespace lc_passage_nav2
+namespace lc_passage_bt_plugins
 {
     class GuardSubscription
     {
@@ -87,10 +87,10 @@ namespace lc_passage_nav2
             return status;
         }
     };
-} // namespace lc_passage_nav2
+} // namespace lc_passage_bt_plugins
 BT_REGISTER_NODES(factory)
 {
-    factory.registerNodeType<lc_passage_nav2::PassageLocked>("PassageLocked");
-    factory.registerNodeType<lc_passage_nav2::PassageSafeRecovery>(
+    factory.registerNodeType<lc_passage_bt_plugins::PassageLocked>("PassageLocked");
+    factory.registerNodeType<lc_passage_bt_plugins::PassageSafeRecovery>(
         "PassageSafeRecovery");
 }

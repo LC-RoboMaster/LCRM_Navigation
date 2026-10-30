@@ -44,7 +44,7 @@ void OmniPidPursuitController::configure(
   bool enable_passages = false;
   declare_parameter_if_not_declared(node, name + ".enable_passage_management", rclcpp::ParameterValue(false));
   node->get_parameter(name + ".enable_passage_management", enable_passages);
-  if (enable_passages) passage_ = std::make_unique<lc_passage_nav2::PassageController>(node, name);
+  if (enable_passages) passage_ = std::make_unique<pb_omni_pid_pursuit_controller::PassageController>(node, name);
 
   costmap_ros_ = costmap_ros;
   costmap_ = costmap_ros_->getCostmap();
@@ -234,7 +234,7 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   nav2_costmap_2d::Costmap2D * costmap = costmap_ros_->getCostmap();
   std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(*(costmap->getMutex()));
 
-  lc_passage_nav2::ExecutionOutput passage_state;
+  pb_omni_pid_pursuit_controller::ExecutionOutput passage_state;
   if (passage_) {
     geometry_msgs::msg::PoseStamped map_pose;
     if (!transformPose(passage_->frame(), pose, map_pose)) {

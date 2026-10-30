@@ -1,8 +1,8 @@
-#include "lc_passage_nav2/execution.hpp"
+#include "pb_omni_pid_pursuit_controller/execution.hpp"
 #include <cstdio>
 #include <fstream>
 #include <iostream>
-using namespace lc_passage_nav2;
+using namespace pb_omni_pid_pursuit_controller;
 void require(bool v, const char *text) {
   if (!v)
     throw std::runtime_error(text);
@@ -153,15 +153,6 @@ int main() {
       }
       require(threw, "invalid arc rejected");
     }
-    PassageFile f;
-    PassageConfig g;
-    g.center = {3, 4};
-    g.yaw = .8;
-    f.passages.push_back(g);
-    require(isBeam(f, {3, 4}, .5), "beam filtering");
-    require(!isBeam(f, {3, 4}, .15), "low obstacle preserved");
-    require(!isBeam(f, {0, 0}, .5), "outside preserved");
-    require(loadPassages("").passages.empty(), "empty annotation mapping mode");
     std::cout << "execution: forward/reverse, stop/ack/hold, timeout, fault, "
                  "lock, overlap, crossing-only speed, separate passages, "
                  "projection, schema, beam height passed\n";

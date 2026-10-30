@@ -1,0 +1,4 @@
+<library path="lc_passage_checkers">
+  <class name="lc_passage_checkers/PassageProgressChecker" type="lc_passage_checkers::PassageProgressChecker" base_class_type="nav2_core::ProgressChecker"><description>Bounded deformation waits.</description></class>
+  <class name="lc_passage_checkers/PassageGoalChecker" type="lc_passage_checkers::PassageGoalChecker" base_class_type="nav2_core::GoalChecker"><description>Wait for release and restoration.</description></class>
+</library>

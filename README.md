@@ -6,6 +6,7 @@
 
 已集成 TDT 全局规划插件、PID 控制器内的变形状态管理和独立 C++/Qt 通道编辑器。支持无通道配置的在线建图导航，也支持保存地图后编辑旋转矩形通道，再加载地图与通道文件按中线通行。实时低矮障碍继续参与避障。
 
+- [过洞代码包归属](docs/passage_packages.md)
 - [导航使用、运行参数及验证](src/lc_passage_nav2/README.md)
 - [Qt 地图编辑器](tools/passage_map_editor/README.md)
 - [底盘变形命令与反馈接口](src/lc_passage_nav2/docs/INTERFACES.md)

@@ -1,5 +1,6 @@
 #pragma once
-#include "lc_passage_nav2/execution.hpp"
+#include "pb_omni_pid_pursuit_controller/execution.hpp"
+#include "lc_passage_common/passage_config.hpp"
 #include <chrono>
 #include <deque>
 #include <lc_passage_msgs/msg/deformation_command.hpp>
@@ -9,8 +10,9 @@
 #include <mutex>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 
-namespace lc_passage_nav2
+namespace pb_omni_pid_pursuit_controller
 {
+    using lc_passage_common::PassageFile;
     // 此类由 PID 控制器持有。没有独立的“变形管理节点”，也不在标量 PID 中做状态判断。
     class PassageController
     {
@@ -51,4 +53,4 @@ namespace lc_passage_nav2
         bool adopt();
         void publish(const ExecutionOutput& output);
     };
-} // namespace lc_passage_nav2
+} // namespace pb_omni_pid_pursuit_controller

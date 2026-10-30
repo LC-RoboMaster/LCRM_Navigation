@@ -16,7 +16,7 @@
 #define PB_OMNI_PID_PURSUIT_CONTROLLER__OMNI_PID_PURSUIT_CONTROLLER_HPP_
 
 #include <memory>
-#include "lc_passage_nav2/passage_controller.hpp"
+#include "pb_omni_pid_pursuit_controller/passage_controller.hpp"
 #include <limits>
 #include <string>
 #include <vector>
@@ -301,7 +301,7 @@ private:
   double max_velocity_scaling_factor_rate_;
   tf2::Duration transform_tolerance_;
 
-  std::unique_ptr<lc_passage_nav2::PassageController> passage_;
+  std::unique_ptr<pb_omni_pid_pursuit_controller::PassageController> passage_;
   double external_speed_limit_ = std::numeric_limits<double>::infinity();
   nav_msgs::msg::Path global_plan_;
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr local_path_pub_;

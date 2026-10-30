@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lc_passage_bt_plugins</name>
+  <version>1.0.0</version>
+  <description>Passage locking and safe recovery BehaviorTree plugins.</description>
+  <maintainer email="yyj051101@outlook.com">HBUT LC RoboMaster</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>lc_passage_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
