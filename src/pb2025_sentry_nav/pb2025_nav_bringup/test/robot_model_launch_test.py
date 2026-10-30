@@ -25,7 +25,10 @@ class ModelLaunchTest(unittest.TestCase):
         source = BRINGUP / "config/reality/nav2_params.yaml"
         original = source.read_bytes()
         context = LaunchContext()
-        context.launch_configurations.update(robot_name="lc_sentry2027", params_file=str(source))
+        context.launch_configurations.update(
+            robot_name="lc_sentry2027", params_file=str(source),
+            rviz_config_file=str(BRINGUP / "rviz/nav2_default_view.rviz"),
+        )
         with patch.object(MODULE, "get_package_share_directory", return_value=str(BRINGUP)):
             for action in MODULE.resolve_robot_model_params(context):
                 action.execute(context)
@@ -45,8 +48,12 @@ class ModelLaunchTest(unittest.TestCase):
             self.assertEqual(config["controller_server"], old["controller_server"])
             self.assertEqual(config["point_lio"], old["point_lio"])
             self.assertEqual(source.read_bytes(), original)
+            rviz = Path(context.launch_configurations["rviz_config_file"])
+            self.assertNotIn("gimbal_yaw", rviz.read_text())
+            self.assertIn("yaw_link_fake", rviz.read_text())
         finally:
             output.unlink()
+            Path(context.launch_configurations["rviz_config_file"]).unlink()
 
     def test_new_driver_keeps_network_but_removes_old_mount_correction(self):
         directory = BRINGUP / "config/reality"

@@ -42,7 +42,7 @@ def generate_launch_description():
                 parameters=[{
                     "use_sim_time": use_sim_time,
                     "rate": 50,
-                    "source_list": [LaunchConfiguration("joint_state_source")],
+                    "source_list": [[LaunchConfiguration("joint_state_source")]],
                 }],
             ),
             Node(

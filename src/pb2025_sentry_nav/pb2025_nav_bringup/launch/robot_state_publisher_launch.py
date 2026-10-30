@@ -81,6 +81,7 @@ def generate_launch_description():
                 ])),
                 condition=LaunchConfigurationEquals("robot_name", "lc_sentry2027"),
                 launch_arguments={
+                    "namespace": "",
                     "use_sim_time": use_sim_time,
                     "use_rviz": "False",
                     "joint_state_source": LaunchConfiguration("joint_state_source"),

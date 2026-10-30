@@ -23,7 +23,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
-from nav2_common.launch import RewrittenYaml
+from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
 def resolve_robot_model_params(context):
@@ -52,7 +52,14 @@ def resolve_robot_model_params(context):
         param_rewrites=rewrites,
         convert_types=True,
     ).perform(context)
-    return [SetLaunchConfiguration("params_file", params)]
+    rviz = ReplaceString(
+        source_file=LaunchConfiguration("rviz_config_file"),
+        replacements={"gimbal_yaw": "yaw_link", "front_mid360": "mid360_link"},
+    ).perform(context)
+    return [
+        SetLaunchConfiguration("params_file", params),
+        SetLaunchConfiguration("rviz_config_file", rviz),
+    ]
 
 
 def generate_launch_description():

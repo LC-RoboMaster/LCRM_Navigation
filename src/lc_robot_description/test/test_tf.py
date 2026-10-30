@@ -29,10 +29,13 @@ class LiveTfTest(unittest.TestCase):
     def check_model(self, namespace):
         prefix = "/" + namespace if namespace else ""
         with tempfile.TemporaryFile(mode="w+") as log:
-            process = subprocess.Popen([
+            command = [
                 "ros2", "launch", str(WRAPPER), "robot_name:=lc_sentry2027",
-                f"namespace:={namespace}", "use_sim_time:=false",
-            ], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+                "use_sim_time:=false",
+            ]
+            if namespace:
+                command.append(f"namespace:={namespace}")
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             node = rclpy.create_node("model_tf_test", cli_args=[
                 "--ros-args", "-r", f"/tf:={prefix}/tf", "-r", f"/tf_static:={prefix}/tf_static",
             ])
