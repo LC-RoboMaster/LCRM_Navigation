@@ -10,6 +10,7 @@
 - [导航使用、运行参数及验证](src/lc_passage_nav2/README.md)
 - [Qt 地图编辑器](tools/passage_map_editor/README.md)
 - [底盘变形命令与反馈接口](src/lc_passage_nav2/docs/INTERFACES.md)
+- [lc_sentry2027 机器人模型与启动方式](src/lc_robot_description/README.md)
 
 ## 环境要求
 

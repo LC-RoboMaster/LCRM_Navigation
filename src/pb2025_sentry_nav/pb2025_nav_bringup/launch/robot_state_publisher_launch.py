@@ -17,21 +17,21 @@
 # It is used to launch the robot state publisher and joint state publisher.
 # But in a complete robot system, this part should be completed by an independent robot startup module
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
+from launch.conditions import LaunchConfigurationEquals, LaunchConfigurationNotEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import PushRosNamespace, SetRemap
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
     # Get the launch directory
-    pkg_pb2025_robot_description_dir = get_package_share_directory(
-        "pb2025_robot_description"
-    )
+    legacy_description_launch = PathJoinSubstitution([
+        FindPackageShare("pb2025_robot_description"),
+        "launch", "robot_description_launch.py",
+    ])
 
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -64,17 +64,27 @@ def generate_launch_description():
             SetRemap("/tf_static", "tf_static"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(
-                        pkg_pb2025_robot_description_dir,
-                        "launch",
-                        "robot_description_launch.py",
-                    )
+                    legacy_description_launch
                 ),
+                condition=LaunchConfigurationNotEquals("robot_name", "lc_sentry2027"),
                 launch_arguments={
                     "namespace": namespace,
                     "use_sim_time": use_sim_time,
                     "robot_name": robot_name,
                     "use_rviz": "False",
+                }.items(),
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(PathJoinSubstitution([
+                    FindPackageShare("lc_robot_description"),
+                    "launch", "lc_sentry2027.launch.py",
+                ])),
+                condition=LaunchConfigurationEquals("robot_name", "lc_sentry2027"),
+                launch_arguments={
+                    "use_sim_time": use_sim_time,
+                    "use_rviz": "False",
+                    "joint_state_source": LaunchConfiguration("joint_state_source"),
+                    "use_joint_state_publisher": LaunchConfiguration("use_joint_state_publisher"),
                 }.items(),
             ),
         ]
@@ -87,6 +97,8 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_robot_name_cmd)
+    ld.add_action(DeclareLaunchArgument("joint_state_source", default_value="serial/gimbal_joint_state"))
+    ld.add_action(DeclareLaunchArgument("use_joint_state_publisher", default_value="true"))
 
     # Add the actions to launch all nodes
     ld.add_action(bringup_cmd_group)

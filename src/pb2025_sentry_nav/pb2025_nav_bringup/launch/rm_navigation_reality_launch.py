@@ -17,13 +17,42 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetLaunchConfiguration
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import RewrittenYaml
+
+
+def resolve_robot_model_params(context):
+    if LaunchConfiguration("robot_name").perform(context) != "lc_sentry2027":
+        return []
+
+    import yaml
+
+    bringup_dir = get_package_share_directory("pb2025_nav_bringup")
+    profile_path = os.path.join(bringup_dir, "config", "reality", "lc_sentry2027.yaml")
+    with open(profile_path, encoding="utf-8") as stream:
+        profile = yaml.safe_load(stream)
+    rewrites = {}
+
+    def flatten(config, prefix=""):
+        for key, value in config.items():
+            path = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                flatten(value, path)
+            else:
+                rewrites[path] = value
+
+    flatten(profile)
+    params = RewrittenYaml(
+        source_file=LaunchConfiguration("params_file"),
+        param_rewrites=rewrites,
+        convert_types=True,
+    ).perform(context)
+    return [SetLaunchConfiguration("params_file", params)]
 
 
 def generate_launch_description():
@@ -44,6 +73,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration("use_respawn")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     use_robot_state_pub = LaunchConfiguration("use_robot_state_pub")
+    robot_name = LaunchConfiguration("robot_name")
     use_rviz = LaunchConfiguration("use_rviz")
 
     # Declare the launch arguments
@@ -124,6 +154,12 @@ def generate_launch_description():
         description="Whether to start the robot state publisher",
     )
 
+    declare_robot_name_cmd = DeclareLaunchArgument(
+        "robot_name",
+        default_value="lc2025_sentry_robot",
+        description="Robot model: lc_sentry2027 or an existing pb2025_robot_description model",
+    )
+
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         "rviz_config_file",
         default_value=os.path.join(bringup_dir, "rviz", "nav2_default_view.rviz"),
@@ -153,6 +189,9 @@ def generate_launch_description():
         launch_arguments={
             "namespace": namespace,
             "use_sim_time": use_sim_time,
+            "robot_name": robot_name,
+            "joint_state_source": LaunchConfiguration("joint_state_source"),
+            "use_joint_state_publisher": LaunchConfiguration("use_joint_state_publisher"),
         }.items(),
     )
 
@@ -215,10 +254,14 @@ def generate_launch_description():
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_rviz_config_file_cmd)
     ld.add_action(declare_use_robot_state_pub_cmd)
+    ld.add_action(declare_robot_name_cmd)
+    ld.add_action(DeclareLaunchArgument("joint_state_source", default_value="serial/gimbal_joint_state"))
+    ld.add_action(DeclareLaunchArgument("use_joint_state_publisher", default_value="true"))
     ld.add_action(declare_use_rviz_cmd)
     ld.add_action(declare_use_respawn_cmd)
 
     # Add the actions to launch all of the navigation nodes
+    ld.add_action(OpaqueFunction(function=resolve_robot_model_params))
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(start_livox_ros_driver2_node)
     ld.add_action(bringup_cmd)

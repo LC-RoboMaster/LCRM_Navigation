@@ -1,0 +1,41 @@
+# lc_sentry2027 只覆盖模型相关参数，其余导航参数沿用 params_file。
+# Point-LIO 的 body/里程计是 IMU 坐标系；原始点云仍在 mid360_link。
+livox_ros_driver2:
+  ros__parameters:
+    frame_id: mid360_link
+    user_config_path: $(find-pkg-share pb2025_nav_bringup)/config/reality/lc_sentry2027_mid360.json
+loam_interface:
+  ros__parameters:
+    lidar_frame: mid360_imu
+sensor_scan_generation:
+  ros__parameters:
+    lidar_frame: mid360_imu
+    robot_base_frame: yaw_link
+terrain_analysis:
+  ros__parameters:
+    sensor_frame: mid360_imu
+fake_vel_transform:
+  ros__parameters:
+    robot_base_frame: yaw_link
+    fake_robot_base_frame: yaw_link_fake
+small_gicp_relocalization:
+  ros__parameters:
+    lidar_frame: mid360_imu
+    robot_base_frame: yaw_link
+bt_navigator:
+  ros__parameters:
+    robot_base_frame: yaw_link_fake
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      robot_base_frame: yaw_link_fake
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      robot_base_frame: yaw_link_fake
+behavior_server:
+  ros__parameters:
+    robot_base_frame: yaw_link_fake
+pb_teleop_twist_joy_node:
+  ros__parameters:
+    robot_base_frame: yaw_link
