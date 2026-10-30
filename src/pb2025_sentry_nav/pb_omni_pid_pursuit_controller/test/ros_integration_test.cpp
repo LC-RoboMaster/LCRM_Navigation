@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 #include <unistd.h>
 

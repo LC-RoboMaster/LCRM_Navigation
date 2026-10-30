@@ -6,6 +6,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/node_factory.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <thread>

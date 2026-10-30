@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <nav2_core/exceptions.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <thread>
 #include <unistd.h>
