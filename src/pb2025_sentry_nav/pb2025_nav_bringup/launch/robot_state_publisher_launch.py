@@ -53,7 +53,7 @@ def generate_launch_description():
     declare_robot_name_cmd = DeclareLaunchArgument(
         "robot_name",
         # default_value="simulation_robot",
-        default_value="lc2025_sentry_robot",
+        default_value="lc_sentry2027",
         description="The file name of the robot xmacro to be used",
     )
 

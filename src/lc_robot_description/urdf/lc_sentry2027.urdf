@@ -546,4 +546,18 @@
     <child link="mid360_imu"/>
     <origin xyz="0.011 0.02329 -0.04412" rpy="0 0 0"/>
   </joint>
+  <!-- 保留 CAD 坐标与安装外参；用零位姿别名兼容原导航配置。 -->
+  <link name="gimbal_yaw"/>
+  <joint name="yaw_link_to_gimbal_yaw" type="fixed">
+    <parent link="yaw_link"/>
+    <child link="gimbal_yaw"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="front_mid360"/>
+  <joint name="mid360_link_to_front_mid360" type="fixed">
+    <parent link="mid360_link"/>
+    <child link="front_mid360"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <!-- gimbal_yaw_fake 由 fake_vel_transform 根据里程计动态发布，不在 URDF 固定。 -->
 </robot>

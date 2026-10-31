@@ -32,7 +32,16 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(links - set(children), {"base_footprint"})
         self.assertNotIn("odom", links)
         self.assertNotIn("yaw_link_fake", links)
+        self.assertNotIn("gimbal_yaw_fake", links)
         self.assertEqual(self.model.attrib["name"], "lc_sentry2027")
+
+    def test_navigation_aliases_preserve_sensor_and_gimbal_origins(self):
+        for parent, child in (("yaw_link", "gimbal_yaw"), ("mid360_link", "front_mid360")):
+            joint = next(j for j in self.model.findall("joint") if j.find("child").attrib["link"] == child)
+            self.assertEqual(joint.attrib["type"], "fixed")
+            self.assertEqual(joint.find("parent").attrib["link"], parent)
+            for key in ("xyz", "rpy"):
+                self.assertEqual([float(x) for x in joint.find("origin").attrib[key].split()], [0., 0., 0.])
 
     def test_imu_frame_matches_point_lio_internal_extrinsic(self):
         params = yaml.safe_load((ROOT / "src/pb2025_sentry_nav/pb2025_nav_bringup/config/reality/nav2_params.yaml").read_text())

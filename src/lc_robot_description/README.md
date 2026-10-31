@@ -24,7 +24,7 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
   robot_name:=lc_sentry2027 use_robot_state_pub:=True slam:=True
 ```
 
-不传 `robot_name` 时继续使用原来的模型和参数。已有独立机器人启动模块发布 TF 时可保持 `use_robot_state_pub:=False`，由该模块加载本包 URDF，避免重复发布。
+在 `dev_new_urdf` 分支中，实车 launch 和模型启动入口默认使用 `lc_sentry2027`，实车 launch 默认开启 `use_robot_state_pub`。旧模型可用 `robot_name:=lc2025_sentry_robot` 选择。已有独立机器人启动模块发布 TF 时，显式传入 `use_robot_state_pub:=False`，由该模块加载本包 URDF，避免重复发布。
 
 ## 坐标系与参数
 
@@ -33,13 +33,17 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 | `base_footprint` | 导航平面参考；当前与原始 `base_link` 重合，没有套用旧机器人高度 |
 | `base_link` | 原始导出模型的底盘坐标系 |
 | `yaw_link` | 原始云台坐标系，由 `yaw_joint` 驱动 |
+| `gimbal_yaw` | 与 `yaw_link` 重合的导航兼容坐标系 |
 | `mid360_link` | 原始 MID360 点云坐标系；保留图纸计算的位置和方向 |
+| `front_mid360` | 与 `mid360_link` 重合的雷达兼容坐标系，供驱动和原有配置使用 |
 | `mid360_imu` | Point-LIO 的 IMU/body 参考；按当前 `mapping.extrinsic_T/R` 加入 |
-| `yaw_link_fake` | 由现有 `fake_vel_transform` 动态发布，URDF 不重复定义 |
+| `gimbal_yaw_fake` | 由现有 `fake_vel_transform` 从 `gimbal_yaw` 动态发布，URDF 不重复定义 |
 
 选择模型后，启动层在原 `params_file` 上叠加 `pb2025_nav_bringup/config/reality/lc_sentry2027.yaml`，仅覆盖坐标系及雷达配置路径；无需复制整份 Nav2 参数。两种 composition 模式、SLAM 和离线导航共享这一入口。
 
-原始点云 `livox/lidar` 的 frame 为 `mid360_link`。Point-LIO 用内部雷达/IMU 外参将其变换到 IMU 参考，故 `loam_interface`、`sensor_scan_generation` 和重定位的 `lidar_frame` 参数绑定 `mid360_imu`；这些参数名沿用现有接口。`sensor_scan` 随之处于 IMU 坐标系，地形分析的 `sensor_frame` 同步设置。URDF 的 `mid360_to_imu` 是 `p_IMU = R_LI * p_LiDAR + T_LI` 的逆变换，当前为 `[0.011, 0.02329, -0.04412]` m、单位旋转。更换 IMU 或修改内部外参时须同步更新二者。
+原始点云 `livox/lidar` 的 frame 为 `front_mid360`，其原点和方向与 `mid360_link` 一致。Point-LIO 用内部雷达/IMU 外参将其变换到 IMU 参考，故 `loam_interface`、`sensor_scan_generation` 和重定位的 `lidar_frame` 参数绑定 `mid360_imu`；这些参数名沿用现有接口。`sensor_scan` 随之处于 IMU 坐标系，地形分析的 `sensor_frame` 同步设置。URDF 的 `mid360_to_imu` 是 `p_IMU = R_LI * p_LiDAR + T_LI` 的逆变换，当前为 `[0.011, 0.02329, -0.04412]` m、单位旋转。更换 IMU 或修改内部外参时须同步更新二者。
+
+实体 TF 链为 `base_footprint → base_link → yaw_link → mid360_link`（中间保留 CAD 支架关节），导航别名接在对应实体坐标系下。`sensor_scan_generation` 在收到 Point-LIO 里程计后发布 `odom → base_footprint`；`fake_vel_transform` 根据 `odometry` 中的云台姿态发布 `gimbal_yaw → gimbal_yaw_fake`，抵消 yaw 旋转。`map → odom` 由 SLAM/重定位提供。这三个运行时变换不写入 URDF；只有模型而没有里程计输入时，模型自身可显示，但不会产生完整的导航 TF 树。
 
 新模型使用 `config/reality/lc_sentry2027_mid360.json`。其中网络地址沿用原雷达配置，驱动层安装外参归零，由 URDF 描述底盘/云台安装关系；旧模型仍使用原 JSON。如需更换雷达 IP/网卡地址，修改新 JSON。
 

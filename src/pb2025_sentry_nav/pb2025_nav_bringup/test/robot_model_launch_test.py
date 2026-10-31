@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from launch import LaunchContext
+from launch.actions import DeclareLaunchArgument
 import yaml
 
 
@@ -25,9 +26,10 @@ class ModelLaunchTest(unittest.TestCase):
         source = BRINGUP / "config/reality/nav2_params.yaml"
         original = source.read_bytes()
         context = LaunchContext()
+        rviz_source = BRINGUP / "rviz/nav2_default_view.rviz"
         context.launch_configurations.update(
             robot_name="lc_sentry2027", params_file=str(source),
-            rviz_config_file=str(BRINGUP / "rviz/nav2_default_view.rviz"),
+            rviz_config_file=str(rviz_source),
         )
         with patch.object(MODULE, "get_package_share_directory", return_value=str(BRINGUP)):
             for action in MODULE.resolve_robot_model_params(context):
@@ -36,24 +38,33 @@ class ModelLaunchTest(unittest.TestCase):
         try:
             config = yaml.safe_load(output.read_text())
             old = yaml.safe_load(source.read_text())
-            self.assertEqual(config["livox_ros_driver2"]["ros__parameters"]["frame_id"], "mid360_link")
+            self.assertEqual(config["livox_ros_driver2"]["ros__parameters"]["frame_id"], "front_mid360")
             for name in ("loam_interface", "sensor_scan_generation", "small_gicp_relocalization"):
                 self.assertEqual(config[name]["ros__parameters"]["lidar_frame"], "mid360_imu")
             self.assertEqual(config["terrain_analysis"]["ros__parameters"]["sensor_frame"], "mid360_imu")
-            self.assertEqual(config["local_costmap"]["local_costmap"]["ros__parameters"]["robot_base_frame"], "yaw_link_fake")
-            self.assertEqual(config["global_costmap"]["global_costmap"]["ros__parameters"]["robot_base_frame"], "yaw_link_fake")
-            self.assertEqual(config["fake_vel_transform"]["ros__parameters"]["robot_base_frame"], "yaw_link")
-            self.assertNotIn("front_mid360", output.read_text())
-            self.assertNotIn("gimbal_yaw", output.read_text())
+            for name in ("local_costmap", "global_costmap"):
+                self.assertEqual(config[name][name]["ros__parameters"]["robot_base_frame"], "gimbal_yaw_fake")
+            for name in ("bt_navigator", "behavior_server"):
+                self.assertEqual(config[name]["ros__parameters"]["robot_base_frame"], "gimbal_yaw_fake")
+            for name in ("fake_vel_transform", "sensor_scan_generation", "small_gicp_relocalization", "pb_teleop_twist_joy_node"):
+                self.assertEqual(config[name]["ros__parameters"]["robot_base_frame"], "gimbal_yaw")
+            self.assertEqual(config["fake_vel_transform"]["ros__parameters"]["fake_robot_base_frame"], "gimbal_yaw_fake")
             self.assertEqual(config["controller_server"], old["controller_server"])
             self.assertEqual(config["point_lio"], old["point_lio"])
             self.assertEqual(source.read_bytes(), original)
-            rviz = Path(context.launch_configurations["rviz_config_file"])
-            self.assertNotIn("gimbal_yaw", rviz.read_text())
-            self.assertIn("yaw_link_fake", rviz.read_text())
+            self.assertEqual(context.launch_configurations["rviz_config_file"], str(rviz_source))
         finally:
             output.unlink()
-            Path(context.launch_configurations["rviz_config_file"]).unlink()
+
+    def test_default_launch_selects_model_and_publishes_its_tf(self):
+        with patch.object(MODULE, "get_package_share_directory", return_value=str(BRINGUP)):
+            description = MODULE.generate_launch_description()
+        context = LaunchContext()
+        for action in description.entities:
+            if isinstance(action, DeclareLaunchArgument):
+                action.execute(context)
+        self.assertEqual(context.launch_configurations["robot_name"], "lc_sentry2027")
+        self.assertEqual(context.launch_configurations["use_robot_state_pub"].lower(), "true")
 
     def test_new_driver_keeps_network_but_removes_old_mount_correction(self):
         directory = BRINGUP / "config/reality"

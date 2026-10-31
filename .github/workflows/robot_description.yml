@@ -13,12 +13,12 @@ jobs:
       - name: Dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends python3-colcon-common-extensions python3-yaml liburdfdom-tools ros-humble-robot-state-publisher ros-humble-joint-state-publisher ros-humble-nav2-common
+          apt-get install -y --no-install-recommends python3-colcon-common-extensions python3-yaml liburdfdom-tools ros-humble-robot-state-publisher ros-humble-joint-state-publisher ros-humble-nav2-common ros-humble-ament-cmake-auto ros-humble-rclcpp-components ros-humble-tf2-geometry-msgs ros-humble-example-interfaces
       - name: Build and validate model
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --packages-select lc_robot_description --cmake-args -DBUILD_TESTING=OFF
+          colcon build --packages-select lc_passage_msgs fake_vel_transform lc_robot_description --executor sequential --cmake-args -DBUILD_TESTING=OFF
           source install/setup.bash
           check_urdf install/lc_robot_description/share/lc_robot_description/urdf/lc_sentry2027.urdf
           python3 src/lc_robot_description/test/test_model.py
