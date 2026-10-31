@@ -100,24 +100,13 @@ void SmallGicpRelocalizationNode::loadGlobalMap(const std::string & file_name)
   }
   RCLCPP_INFO(this->get_logger(), "Loaded global map with %zu points", global_map_->points.size());
 
-  // NOTE: Transform global pcd_map (based on `lidar_odom` frame) to the `odom` frame
-  Eigen::Affine3d odom_to_lidar_odom;
-  while (true) {
-    try {
-      auto tf_stamped = tf_buffer_->lookupTransform(
-        base_frame_, lidar_frame_, this->now(), rclcpp::Duration::from_seconds(1.0));
-      odom_to_lidar_odom = tf2::transformToEigen(tf_stamped.transform);
-      RCLCPP_INFO_STREAM(
-        this->get_logger(), "odom_to_lidar_odom: translation = "
-                              << odom_to_lidar_odom.translation().transpose() << ", rpy = "
-                              << odom_to_lidar_odom.rotation().eulerAngles(0, 1, 2).transpose());
-      break;
-    } catch (tf2::TransformException & ex) {
-      RCLCPP_WARN(this->get_logger(), "TF lookup failed: %s Retrying...", ex.what());
-      rclcpp::sleep_for(std::chrono::seconds(1));
-    }
-  }
-  pcl::transformPointCloud(*global_map_, *global_map_, odom_to_lidar_odom);
+  // 先验 PCD 由 pcd_map_saver 在建图时用 `registered_scan`（odom 系）累积，
+  // 与 map_saver 保存的 pgm 处于同一帧，因此这里不做任何预旋转/预平移：
+  // GICP 的结果直接就是 map->odom。
+  RCLCPP_INFO(
+    this->get_logger(),
+    "Prior map '%s' loaded as-is (expected: accumulated in odom by pcd_map_saver).",
+    file_name.c_str());
 }
 
 void SmallGicpRelocalizationNode::registeredPcdCallback(
@@ -164,7 +153,7 @@ void SmallGicpRelocalizationNode::performRegistration()
 
   if (result.converged && !relocalization_done_) {
     result_t_ = previous_result_t_ = result.T_target_source;
-    
+
     relocalization_done_ = true;
     RCLCPP_ERROR(this->get_logger(), "Relocalization successful. Stopping GICP");
 
@@ -210,8 +199,7 @@ void SmallGicpRelocalizationNode::initialPoseCallback(
     msg->pose.pose.position.y, msg->pose.pose.position.z);
 
   Eigen::Isometry3d map_to_robot_base = Eigen::Isometry3d::Identity();
-  map_to_robot_base.translation() << msg->pose.pose.position.x, msg->pose.pose.position.y,
-    msg->pose.pose.position.z;
+  map_to_robot_base.translation() << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
   map_to_robot_base.linear() = Eigen::Quaterniond(
                                  msg->pose.pose.orientation.w, msg->pose.pose.orientation.x,
                                  msg->pose.pose.orientation.y, msg->pose.pose.orientation.z)

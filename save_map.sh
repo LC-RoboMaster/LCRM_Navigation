@@ -4,3 +4,4 @@ workspace_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source /opt/ros/humble/setup.bash
 source "$workspace_root/install/setup.bash"
 exec ros2 run nav2_map_server map_saver_cli -f "${1:-scans}" "${@:2}"
+#ros2 run nav2_map_server map_saver_cli -f <YOUR_MAP_NAME> --ros-args -r __ns:=/red_standard_robot1

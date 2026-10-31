@@ -35,8 +35,6 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
   this->get_parameter("base_frame", base_frame_);
   this->get_parameter("lidar_frame", lidar_frame_);
 
-  base_frame_to_lidar_initialized_ = false;
-
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
@@ -55,8 +53,11 @@ void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::
 {
   // NOTE: Input point cloud message is based on the `lidar_odom`
   // Here we transform it to the REAL `odom` frame
+  if (!base_frame_to_lidar_initialized_) {
+    return;  // 等首帧里程计确定 odom 与世界系的相对关系
+  }
   auto out = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl_ros::transformPointCloud(odom_frame_, tf_odom_to_lidar_odom_, *msg, *out);
+  pcl_ros::transformPointCloud(odom_frame_, tf_odom_to_world_, *msg, *out);
   pcd_pub_->publish(*out);
 }
 
@@ -64,13 +65,19 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
 {
   // NOTE: Input odometry message is based on the `lidar_odom`
   // Here we transform it to the `odom` frame
+  tf2::Transform tf_world_to_lidar;
+  tf2::fromMsg(msg->pose.pose, tf_world_to_lidar);
+
   if (!base_frame_to_lidar_initialized_) {
     try {
       auto tf_stamped = tf_buffer_->lookupTransform(
         base_frame_, lidar_frame_, msg->header.stamp, rclcpp::Duration::from_seconds(0.5));
-      tf2::Transform tf_base_frame_to_lidar;
-      tf2::fromMsg(tf_stamped.transform, tf_base_frame_to_lidar);
-      tf_odom_to_lidar_odom_ = tf_base_frame_to_lidar;
+      tf2::Transform tf_base_to_lidar;
+      tf2::fromMsg(tf_stamped.transform, tf_base_to_lidar);
+      // odom 定义为启动时刻的 base_frame：原点在 base_frame 上，轴向与 LIO 世界系一致
+      // （即重力对齐）。首帧姿态 T_world<-lidar 里含雷达安装角，必须扣掉，
+      // 否则 odom->base_frame 会残留该安装角。
+      tf_odom_to_world_ = tf_base_to_lidar * tf_world_to_lidar.inverse();
       base_frame_to_lidar_initialized_ = true;
     } catch (tf2::TransformException & ex) {
       RCLCPP_WARN(this->get_logger(), "TF lookup failed: %s Retrying...", ex.what());
@@ -79,9 +86,7 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   }
 
   // Transform the odometry_msg (based lidar_odom) to the odom frame
-  tf2::Transform tf_lidar_odom_to_lidar;
-  tf2::fromMsg(msg->pose.pose, tf_lidar_odom_to_lidar);
-  tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar;
+  tf2::Transform tf_odom_to_lidar = tf_odom_to_world_ * tf_world_to_lidar;
 
   nav_msgs::msg::Odometry out;
   out.header.stamp = msg->header.stamp;

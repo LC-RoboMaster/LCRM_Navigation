@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>pcd_map_saver</name>
+  <version>0.1.0</version>
+  <description>
+    Accumulate a point cloud topic that is already expressed in the navigation odom frame
+    (e.g. loam_interface's registered_scan) and save it as a binary PCD on shutdown.
+    The result shares the frame of the 2D map saved by map_saver, so GICP relocalization
+    needs no extra pre-transform.
+  </description>
+  <maintainer email="yyj051101@outlook.com">HBUT RM Vision</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>pcl_conversions</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

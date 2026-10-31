@@ -35,6 +35,7 @@ def generate_launch_description():
     autostart = LaunchConfiguration("autostart")
     use_respawn = LaunchConfiguration("use_respawn")
     log_level = LaunchConfiguration("log_level")
+    map_pcd_file = LaunchConfiguration("map_pcd_file")
 
     # Variables
     lifecycle_nodes = ["map_saver"]
@@ -83,6 +84,15 @@ def generate_launch_description():
 
     declare_log_level_cmd = DeclareLaunchArgument(
         "log_level", default_value="info", description="log level"
+    )
+
+    declare_map_pcd_file_cmd = DeclareLaunchArgument(
+        "map_pcd_file",
+        default_value=os.path.join(os.getcwd(), "scans.pcd"),
+        description=(
+            "Output PCD for GICP relocalization. It is accumulated in the odom frame, "
+            "so it shares the frame of the 2D map saved by map_saver."
+        ),
     )
 
     start_map_saver_server_cmd = Node(
@@ -149,7 +159,26 @@ def generate_launch_description():
         parameters=[
             configured_params,
             {"prior_pcd.enable": False},
-            {"pcd_save.pcd_save_en": True},
+            # 不再让 point_lio 存 camera_init 系的地图：先验 PCD 由 pcd_map_saver
+            # 在 odom 系累积，和 map_saver 的 pgm 同帧。
+            {"pcd_save.pcd_save_en": False},
+        ],
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
+    start_pcd_map_saver_node = Node(
+        package="pcd_map_saver",
+        executable="pcd_map_saver_node",
+        name="pcd_map_saver",
+        output="screen",
+        respawn=use_respawn,
+        respawn_delay=2.0,
+        parameters=[
+            {
+                "cloud_topic": "registered_scan",
+                "output_file": map_pcd_file,
+                "expected_frame": "odom",
+            }
         ],
         arguments=["--ros-args", "--log-level", log_level],
     )
@@ -188,6 +217,7 @@ def generate_launch_description():
     ld.add_action(declare_autostart_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(declare_map_pcd_file_cmd)
 
     # Running Map Saver Server
     ld.add_action(start_map_saver_server_cmd)
@@ -196,6 +226,7 @@ def generate_launch_description():
     ld.add_action(start_pointcloud_to_laserscan_node)
     ld.add_action(start_sync_slam_toolbox_node)
     ld.add_action(start_point_lio_node)
+    ld.add_action(start_pcd_map_saver_node)
     ld.add_action(start_static_transform_node)
 
     return ld

@@ -55,6 +55,8 @@ private:
   std::string lidar_frame_;
   std::string base_frame_;
   std::string robot_base_frame_;
+  // true: 发布 2D 地面 base_footprint（z=0, roll=pitch=0，只保留 x/y/yaw）
+  bool flatten_footprint_{false};
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> br_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_laser_cloud_;

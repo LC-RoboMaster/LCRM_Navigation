@@ -96,6 +96,9 @@ sensor_scan_generation:
     lidar_frame: "front_mid360"
     base_frame: "base_footprint"
     robot_base_frame: "gimbal_yaw"
+    # false: base_footprint 保留车体真实 roll/pitch（坡上跟着倾斜）
+    # true : base_footprint 压成 2D 地面帧（z=0、roll=pitch=0，只留 x/y/yaw）
+    flatten_footprint: false
 
 terrain_analysis:
   ros__parameters:

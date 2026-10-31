@@ -51,8 +51,11 @@ private:
   std::string lidar_frame_;
   std::string base_frame_;
 
-  bool base_frame_to_lidar_initialized_;
-  tf2::Transform tf_odom_to_lidar_odom_;
+  bool base_frame_to_lidar_initialized_{false};
+  // T_odom<-lidar_odom(world)，由首帧里程计和 base_frame<-lidar_frame 静态变换确定。
+  // 不能直接用 base_frame<-lidar_frame 当作该变换：Point-LIO 首帧姿态包含雷达安装角，
+  // 直接用会把这个安装角重复计入 odom->base_footprint。
+  tf2::Transform tf_odom_to_world_;
 };
 
 }  // namespace loam_interface

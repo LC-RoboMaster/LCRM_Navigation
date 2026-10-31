@@ -37,9 +37,26 @@ source install/setup.bash
 | `rm_navigation_bringup.sh` | 实车导航（定位模式，`slam:=False`） |
 | `rm_navigation_bringup_slam.sh` | 实车导航（建图模式，`slam:=True`） |
 | `save_map.sh` | 保存当前地图为 `scans.pgm` / `scans.yaml` |
-| `cp_map_data.sh` | 将地图/点云数据拷贝到 `pb2025_nav_bringup` 对应目录并重新构建 |
+| `cp_map_data.sh` | 将 `scans.pcd`(odom) + `scans.pgm` + `scans.yaml` 拷到 `pb2025_nav_bringup` 并重新构建 |
 
-> 导航和地图保存脚本按当前仓库定位工作空间，并转发命令行参数；其余决策、数据拷贝脚本仍保留原车端路径，移植时需调整。
+> 导航和地图保存脚本按当前仓库定位工作空间，并转发命令行参数。
+
+### 建图产物与坐标系
+
+一次建图会产生三份数据，必须在**同一坐标系**下配套使用：
+
+| 文件 | 产生者 | 坐标系 |
+| --- | --- | --- |
+| `scans.pcd` | `pcd_map_saver`（建图 launch 自动启动，默认写到启动目录） | `odom` |
+| `scans.pgm` / `scans.yaml` | `save_map.sh`（nav2 `map_saver`） | `map` = 建图时的 `odom` |
+
+定位时 `small_gicp` 直接把这张 PCD 当作 `map` 系先验，不做任何预旋转。因此**不要**再用
+`point_lio/PCD/scans.pcd`（它是 `camera_init` 系，和 pgm 差一个与建图启动云台角有关的
+yaw，会导致重定位后机器人相对地图“歪着”）；建图 launch 已把 `pcd_save` 关闭。
+
+建图结束时，先在另一个终端执行 `bash save_map.sh scans`（`map_saver` 还在运行）保存
+pgm/yaml，再 Ctrl-C 结束 launch；`pcd_map_saver` 会在退出时把 `scans.pcd` 写到同一目录，
+看到 `Saved ... points` 日志后再关闭终端。最后执行 `bash cp_map_data.sh`。
 
 ## 子项目说明
 

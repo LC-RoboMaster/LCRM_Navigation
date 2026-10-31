@@ -30,7 +30,7 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 
 | 坐标系 | 用途 |
 | --- | --- |
-| `base_footprint` | 导航平面参考；当前与原始 `base_link` 重合，没有套用旧机器人高度 |
+| `base_footprint` | 导航平面参考；位于轮子接地点所在水平面（比 `base_link` 原点低 0.0513 m） |
 | `base_link` | 原始导出模型的底盘坐标系 |
 | `yaw_link` | 原始云台坐标系，由 `yaw_joint` 驱动 |
 | `gimbal_yaw` | 与 `yaw_link` 重合的导航兼容坐标系 |
@@ -43,7 +43,9 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 
 原始点云 `livox/lidar` 的 frame 为 `front_mid360`，其原点和方向与 `mid360_link` 一致。Point-LIO 用内部雷达/IMU 外参将其变换到 IMU 参考，故 `loam_interface`、`sensor_scan_generation` 和重定位的 `lidar_frame` 参数绑定 `mid360_imu`；这些参数名沿用现有接口。`sensor_scan` 随之处于 IMU 坐标系，地形分析的 `sensor_frame` 同步设置。URDF 的 `mid360_to_imu` 是 `p_IMU = R_LI * p_LiDAR + T_LI` 的逆变换，当前为 `[0.011, 0.02329, -0.04412]` m、单位旋转。更换 IMU 或修改内部外参时须同步更新二者。
 
-实体 TF 链为 `base_footprint → base_link → yaw_link → mid360_link`（中间保留 CAD 支架关节），导航别名接在对应实体坐标系下。`sensor_scan_generation` 在收到 Point-LIO 里程计后发布 `odom → base_footprint`；`fake_vel_transform` 根据 `odometry` 中的云台姿态发布 `gimbal_yaw → gimbal_yaw_fake`，抵消 yaw 旋转。`map → odom` 由 SLAM/重定位提供。这三个运行时变换不写入 URDF；只有模型而没有里程计输入时，模型自身可显示，但不会产生完整的导航 TF 树。
+实体 TF 链为 `base_footprint → base_link → yaw_link → mid360_link`（中间保留 CAD 支架关节），导航别名接在对应实体坐标系下。`loam_interface` 用首帧里程计把 `odom` 定义为启动时刻的 `base_footprint`（轴向仍与 Point-LIO 的重力对齐世界系一致，并扣掉首帧姿态里的雷达安装角）；`sensor_scan_generation` 再乘 `mid360_imu → base_footprint` 静态链发布 `odom → base_footprint`，可用 `flatten_footprint` 参数把它压成 2D 地面帧；`fake_vel_transform` 根据 `odometry` 中的云台姿态发布 `gimbal_yaw → gimbal_yaw_fake`，抵消 yaw 旋转。`map → odom` 由 SLAM/重定位提供。这些运行时变换不写入 URDF；只有模型而没有里程计输入时，模型自身可显示，但不会产生完整的导航 TF 树。
+
+> 注意：`odom` 的定义（重定基方式）参与地图坐标系。改动 `loam_interface` 或 `base_footprint` 高度后，旧的地图 `.pgm/.yaml` 与先验 `.pcd` 必须用新代码重新录制，否则两者与新 `odom` 不再同帧。建图时 `pcd_map_saver` 会在 `odom` 系累积 `scans.pcd`，与 `map_saver` 的 pgm 同帧；定位时 `small_gicp` 直接使用它，不要再拷贝 `point_lio/PCD/scans.pcd`（`camera_init` 系）。
 
 新模型使用 `config/reality/lc_sentry2027_mid360.json`。其中网络地址沿用原雷达配置，驱动层安装外参归零，由 URDF 描述底盘/云台安装关系；旧模型仍使用原 JSON。如需更换雷达 IP/网卡地址，修改新 JSON。
 

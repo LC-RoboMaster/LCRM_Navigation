@@ -15,10 +15,24 @@
 #include "sensor_scan_generation/sensor_scan_generation.hpp"
 
 #include "pcl_ros/transforms.hpp"
+#include "tf2/utils.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 namespace sensor_scan_generation
 {
+
+namespace
+{
+// 把 6-DOF 位姿压成 2D 地面位姿：只保留 x/y/yaw，z=0、roll=pitch=0。
+// 用于需要严格平面 base_footprint 的场景；会丢弃车体 roll/pitch。
+tf2::Transform flattenTransform(const tf2::Transform & tf)
+{
+  const tf2::Vector3 origin = tf.getOrigin();
+  tf2::Quaternion q;
+  q.setRPY(0.0, 0.0, tf2::getYaw(tf.getRotation()));
+  return tf2::Transform(q, tf2::Vector3(origin.x(), origin.y(), 0.0));
+}
+}  // namespace
 
 SensorScanGenerationNode::SensorScanGenerationNode(const rclcpp::NodeOptions & options)
 : Node("sensor_scan_generation", options)
@@ -26,10 +40,12 @@ SensorScanGenerationNode::SensorScanGenerationNode(const rclcpp::NodeOptions & o
   this->declare_parameter<std::string>("lidar_frame", "");
   this->declare_parameter<std::string>("base_frame", "");
   this->declare_parameter<std::string>("robot_base_frame", "");
+  this->declare_parameter<bool>("flatten_footprint", false);
 
   this->get_parameter("lidar_frame", lidar_frame_);
   this->get_parameter("base_frame", base_frame_);
   this->get_parameter("robot_base_frame", robot_base_frame_);
+  this->get_parameter("flatten_footprint", flatten_footprint_);
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
@@ -74,6 +90,11 @@ void SensorScanGenerationNode::laserCloudAndOdometryHandler(
 
   tf_odom_to_chassis = tf_odom_to_lidar * tf_lidar_to_chassis;
   tf_odom_to_robot_base = tf_odom_to_lidar * tf_lidar_to_robot_base_;
+
+  if (flatten_footprint_) {
+    tf_odom_to_chassis = flattenTransform(tf_odom_to_chassis);
+    tf_odom_to_robot_base = flattenTransform(tf_odom_to_robot_base);
+  }
 
   publishTransform(
     tf_odom_to_chassis, odometry_msg->header.frame_id, base_frame_, pcd_msg->header.stamp);

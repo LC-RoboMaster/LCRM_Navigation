@@ -16,3 +16,4 @@ __pycache__/
 # 编译中间产物
 *.o
 /build-editor/
+/.ros_log_tmp/

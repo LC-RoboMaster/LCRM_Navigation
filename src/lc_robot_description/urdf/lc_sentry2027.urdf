@@ -531,12 +531,14 @@
       effort="0"
       velocity="0" />
   </joint>
-  <!-- 导航平面参考沿用导出模型原点；不加入旧模型的安装高度。 -->
+  <!-- 导航平面参考：base_footprint 位于轮子接地点所在水平面。
+       0.0513 m = 轮子网格最低点相对 base_link 原点的 -z（由 STL 包围盒算得），
+       即底盘原点离地高度。改轮径/悬挂时需同步更新。 -->
   <link name="base_footprint"/>
   <joint name="base_footprint_to_base_link" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="0 0 0.0513" rpy="0 0 0"/>
   </joint>
   <!-- Point-LIO: p_IMU = R_LI * p_LiDAR + T_LI。此处为其逆变换。
        与实车 nav2_params.yaml 的 mapping.extrinsic_T/R 一致，非底盘安装外参。 -->
