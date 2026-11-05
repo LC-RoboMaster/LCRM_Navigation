@@ -23,7 +23,7 @@ namespace pb_omni_pid_pursuit_controller
         double enter = 0; // 入口弧长
         double exit = 0; // 出口弧长
         double release = 0; // 释放点弧长
-        double speed = .3; // 穿越速度上限
+        double speed = 3.0; // 穿越速度上限
         double fold_hold = .3;
         double restore_hold = .3;
     };

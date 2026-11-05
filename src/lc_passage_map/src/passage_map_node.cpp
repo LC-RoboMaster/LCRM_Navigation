@@ -125,8 +125,7 @@ namespace lc_passage_map
                 output.data.reserve(input.data.size());
                 output.height = 1;
                 output.width = 0;
-                for (size_t i = 0; i < size_t(input.width) * input.height;
-                     ++i, ++x, ++y, ++z, ++height)
+                for (size_t i = 0; i < size_t(input.width) * input.height; ++i, ++x, ++y, ++z, ++height)
                 {
                     geometry_msgs::msg::PointStamped p, q;
                     p.point.x = *x;

@@ -335,7 +335,7 @@ controller_server:
       enable_passage_management: true
       passage_file: ""
       passage_action_timeout: 8.0
-      passage_stop_tolerance: 0.04
+      passage_stop_tolerance: 0.5
       passage_deceleration: 0.8 # 仅穿越末尾向释放点制动；洞外接近准备点沿用普通 PID
       translation_kp: 3.0
       translation_ki: 0.1
